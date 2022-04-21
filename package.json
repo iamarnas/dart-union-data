@@ -11,17 +11,11 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:dart-union-data.helloWorld",
 		"onLanguage:dart"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
-		"commands": [
-			{
-				"command": "dart-union-data.helloWorld",
-				"title": "Hello World"
-			}
-		]
+		"commands": []
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",

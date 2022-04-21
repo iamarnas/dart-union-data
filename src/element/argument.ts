@@ -1,6 +1,6 @@
-import { ParameterElement } from '../element/element';
+import { ArgumentElement } from './element';
 
-export default class Parameter implements ParameterElement {
+export default class Argument implements ArgumentElement {
     name: string;
     type: string;
     value: string;
@@ -18,20 +18,20 @@ export default class Parameter implements ParameterElement {
         this.defaultValue = '';
     }
 
-    static fromString(input: string): Parameter {
-        return new Parameter('', '');
+    static fromString(input?: string): Argument[] {
+        return input ? argumentsFromString(input) : [];
     }
 }
 
 /**
- * Generates parameters list from the given string. 
+ * Generates arguments list from the given string. 
  * 
- * Parameters must be wrapped by parentheses `(...)` as string.
- * @param {string} text a valid Dart constructor with parameters as `string`.
- * @returns a list Parameter[].
+ * Arguments must be wrapped by parentheses `"(...)"` as string.
+ * @param {string} text a valid Dart constructor with arguments as `string`.
+ * @returns a list Argument[].
  */
-function parametersFromString(input: string): Parameter[] {
-    const parameters: Parameter[] = [];
+const argumentsFromString = (input: string): Argument[] => {
+    const parameters: Argument[] = [];
     const body = input.slice(input.indexOf('(') + 1, input.indexOf(')')).trim();
     const brackets = /{|}|\[|\]/gm;
     const curlyBrackets = /{|}/gm;
@@ -58,7 +58,7 @@ function parametersFromString(input: string): Parameter[] {
 
     for (let i = 0; i < allParams.length; i++) {
         const line = allParams[i];
-        const parameter = new Parameter('', '');
+        const parameter = new Argument('', '');
 
         if (namedParams.length) {
             if (namedParams.includes(line)) {
@@ -77,7 +77,7 @@ function parametersFromString(input: string): Parameter[] {
                 parameter.name = split[1];
                 parameter.isNamed = true;
                 parameter.isOptional = true;
-                parameter.nullable = split[0].includes('?') ?? false;
+                parameter.nullable = split[0].includes('?');
             }
         }
 
@@ -108,7 +108,7 @@ function parametersFromString(input: string): Parameter[] {
     }
 
     return parameters.sort((a, b) => Number(a.isOptional) - Number(b.isOptional));
-}
+};
 
 export function constructorBuilder(input: string, prefix = 'this.'): string {
     const empty = /^\(\s*\)$/i;

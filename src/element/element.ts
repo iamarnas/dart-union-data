@@ -1,40 +1,33 @@
 export interface ClassElement {
     name: string,
+    displayName: string,
     documentationComment?: string,
     isEnum: boolean,
     isAbstract: boolean,
-    genericType?: string,
+    genericType?: GenericType,
     fields: FieldElement[],
-    constructors: ConstructorElement[],
+    elementConstructor?: Element,
+}
+
+export interface FieldElement {
+    name?: string,
+    displayName?: string,
+    documentationComment?: string,
+    isConst: boolean,
+    isConstructor: boolean,
+    isPrivate: boolean,
+    isFactory: boolean,
+    subclassName?: string,
+    element: Element;
 }
 
 export interface Element {
     name: string,
     displayName: string,
-    documentationComment?: string,
-    genericType?: string,
+    arguments: ArgumentElement[],
 }
 
-export interface FieldElement {
-    name?: string,
-    displayName: string,
-    isFinal: boolean,
-    isStatic: boolean;
-    element: Element;
-    parameter: ParameterElement,
-    constructor: ConstructorElement;
-}
-
-export interface ConstructorElement {
-    name: string,
-    factoryName?: string,
-    isConst: boolean,
-    isPrivate: boolean,
-    isFactory: boolean,
-    parameters: ParameterElement[],
-}
-
-export interface ParameterElement {
+export interface ArgumentElement {
     name: string,
     type: string,
     value?: string,
@@ -45,3 +38,9 @@ export interface ParameterElement {
     isOptional: boolean,
     defaultValue?: string,
 }
+
+export type GenericType = {
+    type: string,
+    displayName: string,
+    extendsTo?: string,
+};

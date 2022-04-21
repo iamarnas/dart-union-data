@@ -1,9 +1,3 @@
-export interface StringOptions {
-    tabs?: number,
-    prefix?: string,
-    suffix?: string,
-}
-
 interface StringSink {
     /**
      * Writes the string representation of [object].
@@ -16,9 +10,9 @@ interface StringSink {
      * Iterates over the given [objects] and [write]s them in sequence. 
      * @param objects which will be written in sequence.
      * @param separator the default separator is `""`
-     * @param options adds more options from the [StringOptions] to the printed value.
+     * @param tabs adds tab before value.
      */
-    writeAll(objects: unknown[], separator?: string, options?: StringOptions): void;
+    writeAll(objects: unknown[], separator?: string, tabs?: number): void;
 
     /**
      * 
@@ -68,32 +62,21 @@ export class StringBuffer implements StringSink {
         return !this.isEmpty;
     }
 
-    write(object?: unknown): void {
-        this.content += `${object}`;
+    write(object?: unknown, tabs?: number): void {
+        this.content += `${addTabs(tabs)}${object}`;
     }
 
-    writeAll(objects: unknown[], separator = '', options?: StringOptions): void {
-        const tabs = options?.tabs;
-        const prefix = options?.prefix ?? '';
-        const suffix = options?.suffix ?? '';
-        const object = (e: unknown): string => `${addTabs(tabs)}${prefix}${e}${suffix}`;
+    writeAll(objects: unknown[], separator = '', tabs?: number): void {
+        const object = (e: unknown): string => `${addTabs(tabs)}${e}`;
         this.content += objects.map(object).join(separator);
     }
 
-    writeln(object?: unknown): void {
+    writeln(object?: unknown, tabs?: number): void {
         if (object) {
-            this.content += `\n${object}`;
+            this.content += `\n${addTabs(tabs)}${object}`;
         } else {
             this.content += '\n';
         }
-    }
-
-    /**
-     * Convenience function to add tabs `"\t"` to the content.
-     * @param tabs represent how many tabs will be added.
-     */
-    writeTab(tabs?: number): void {
-        this.content += addTabs(tabs);
     }
 
     /**
