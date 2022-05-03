@@ -4,7 +4,7 @@ interface StringSink {
      * 
      * Converts [object] to a string.
      */
-    write(object?: unknown): void;
+    write(object: unknown): void;
 
     /**
      * Iterates over the given [objects] and [write]s them in sequence. 
@@ -30,16 +30,7 @@ interface StringSink {
  * The strings are concatenated to a single string only when `toString` is called.
  */
 export class StringBuffer implements StringSink {
-    /** 
-     * Output content.
-     * 
-     * Returns final result of the string.
-     */
-    private content: string;
-
-    constructor(content = '') {
-        this.content = content;
-    }
+    constructor(private content = '') { }
 
     /**
      * Specifies the length of the content.
@@ -62,7 +53,7 @@ export class StringBuffer implements StringSink {
         return !this.isEmpty;
     }
 
-    write(object?: unknown, tabs?: number): void {
+    write(object: unknown, tabs?: number): void {
         this.content += `${addTabs(tabs)}${object}`;
     }
 
@@ -95,8 +86,7 @@ export class StringBuffer implements StringSink {
 }
 
 function addTabs(tabs?: number): string {
-    if (!tabs) { return ''; }
-
+    if (!tabs) return '';
     let sb = '';
     let i = 0;
 

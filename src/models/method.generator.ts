@@ -1,72 +1,19 @@
-import { ClassElement, FieldElement } from '../element/element';
+import ClassData from '../element/class.data';
+import { FieldElement } from '../element/element';
 import { StringBuffer } from '../utils/string-buffer';
 
-export class EnumExtensionGenerator {
-    private element: ClassElement;
-    private enumType: string;
-    private values: FieldElement[] = [];
-    private sb: StringBuffer = new StringBuffer();
-
-    constructor(element: ClassElement) {
-        this.element = element;
-        this.enumType = element.name;
-        this.values = element.fields;
-    }
-
-    generate(): string {
-        this.extensionHead();
-        this.checkers();
-        this.methods();
-        this.extensionBottom();
-        return this.sb.toString();
-    }
-
-    private extensionHead() {
-        const name = `${this.enumType}Extension`;
-        this.sb.writeln(`extension ${name} on ${this.enumType} {`);
-    }
-
-    private checkers() {
-        for (const value of this.values) {
-            this.checker(value);
-        }
-    }
-
-    private checker(e: FieldElement) {
-        if (!e.name) return;
-        const name = e.name.slice(0, 1).toUpperCase() + e.name.slice(1);
-        this.sb.writeln(`bool get is${name} => this == ${this.enumType}.${e.name};`, 1);
-    }
-
-    private extensionBottom() {
-        this.sb.writeln('}');
-    }
-
-    private methods() {
-        const methodGenerator = new MethodGenerator(this.element);
-        this.sb.writeln(methodGenerator.generate('map'));
-        this.sb.writeln(methodGenerator.generate('maybeMap'));
-        this.sb.writeln(methodGenerator.generate('mapOrNull'));
-        this.sb.writeln(methodGenerator.generate('when'));
-        this.sb.writeln(methodGenerator.generate('maybeWhen'));
-        this.sb.writeln(methodGenerator.generate('whenOrNull'));
-    }
-}
-
-class MethodGenerator {
-    private element: ClassElement;
-    private values: FieldElement[];
+export class MethodGenerator {
+    private readonly fields: FieldElement[];
+    private readonly name: string;
     private sb: StringBuffer = new StringBuffer();
     private methodType: MethodType = 'when';
-    private name: string;
 
-    constructor(element: ClassElement) {
-        this.element = element;
-        this.values = element.fields;
+    constructor(private readonly element: ClassData) {
+        this.fields = element.fields;
         this.name = element.name;
     }
 
-    static fromElement(element: ClassElement): MethodGenerator {
+    static fromElement(element: ClassData): MethodGenerator {
         return new MethodGenerator(element);
     }
 
@@ -154,16 +101,16 @@ class MethodGenerator {
 
     private mapOrNullConstructor() {
         this.sb.write('({');
-        for (const value of this.values) {
-            this.sb.writeln(`R Function(${this.name} ${value.name})? ${value.name},`, 2);
+        for (const field of this.fields) {
+            this.sb.writeln(`R Function(${this.name} ${field.name})? ${field.name},`, 2);
         }
         this.sb.writeln('})', 1);
     }
 
     private maybeMapConstructor() {
         this.sb.write('({');
-        for (const value of this.values) {
-            this.sb.writeln(`R Function(${this.name} ${value.name})? ${value.name},`, 2);
+        for (const field of this.fields) {
+            this.sb.writeln(`R Function(${this.name} ${field.name})? ${field.name},`, 2);
         }
         this.sb.writeln('required R Function() orElse,', 2);
         this.sb.writeln('})', 1);
@@ -171,24 +118,24 @@ class MethodGenerator {
 
     private mapConstructor() {
         this.sb.write('({');
-        for (const value of this.values) {
-            this.sb.writeln(`required R Function(${this.name} ${value.name}) ${value.name},`, 2);
+        for (const field of this.fields) {
+            this.sb.writeln(`required R Function(${this.name} ${field.name}) ${field.name},`, 2);
         }
         this.sb.writeln('})', 1);
     }
 
     private whenOrNullConstructor() {
         this.sb.write('({');
-        for (const value of this.values) {
-            this.sb.writeln(`R Function()? ${value.name},`, 2);
+        for (const field of this.fields) {
+            this.sb.writeln(`R Function()? ${field.name},`, 2);
         }
         this.sb.writeln('})', 1);
     }
 
     private maybeWhenConstructor() {
         this.sb.write('({');
-        for (const value of this.values) {
-            this.sb.writeln(`R Function()? ${value.name},`, 2);
+        for (const field of this.fields) {
+            this.sb.writeln(`R Function()? ${field.name},`, 2);
         }
         this.sb.writeln('required R Function() orElse,', 2);
         this.sb.writeln('})', 1);
@@ -196,8 +143,8 @@ class MethodGenerator {
 
     private whenConstructor() {
         this.sb.write('({');
-        for (const value of this.values) {
-            this.sb.writeln(`required R Function() ${value.name},`, 2);
+        for (const field of this.fields) {
+            this.sb.writeln(`required R Function() ${field.name},`, 2);
         }
         this.sb.writeln('})', 1);
     }
@@ -205,9 +152,9 @@ class MethodGenerator {
     private whenBlock() {
         this.sb.write(' {');
         this.sb.writeln('switch (this) {', 2);
-        for (const value of this.values) {
-            this.sb.writeln(`case ${this.name}.${value.name}:`, 3);
-            this.sb.writeln(`return ${value.name}();`, 4);
+        for (const field of this.fields) {
+            this.sb.writeln(`case ${this.name}.${field.name}:`, 3);
+            this.sb.writeln(`return ${field.name}();`, 4);
         }
         this.sb.writeln('}', 2);
         this.sb.writeln('}', 1);
@@ -215,8 +162,8 @@ class MethodGenerator {
 
     private maybeWhenBlock() {
         this.sb.write(' {');
-        for (let i = 0; i < this.values.length; i++) {
-            const value = this.values[i];
+        for (let i = 0; i < this.fields.length; i++) {
+            const value = this.fields[i];
 
             if (i === 0) {
                 this.sb.writeln(`if (this == ${this.name}.${value.name} && ${value.name} != null) {`, 2);
@@ -235,9 +182,9 @@ class MethodGenerator {
     private whenOrNullBlock() {
         this.sb.write(' {');
         this.sb.writeln('switch (this) {', 2);
-        for (const value of this.values) {
-            this.sb.writeln(`case ${this.name}.${value.name}:`, 3);
-            this.sb.writeln(`return ${value.name}?.call();`, 4);
+        for (const field of this.fields) {
+            this.sb.writeln(`case ${this.name}.${field.name}:`, 3);
+            this.sb.writeln(`return ${field.name}?.call();`, 4);
         }
         this.sb.writeln('}', 2);
         this.sb.writeln('}', 1);
@@ -246,9 +193,9 @@ class MethodGenerator {
     private mapBlock() {
         this.sb.write(' {');
         this.sb.writeln('switch (this) {', 2);
-        for (const value of this.values) {
-            this.sb.writeln(`case ${this.name}.${value.name}:`, 3);
-            this.sb.writeln(`return ${value.name}(this);`, 4);
+        for (const field of this.fields) {
+            this.sb.writeln(`case ${this.name}.${field.name}:`, 3);
+            this.sb.writeln(`return ${field.name}(this);`, 4);
         }
         this.sb.writeln('}', 2);
         this.sb.writeln('}', 1);
@@ -256,8 +203,8 @@ class MethodGenerator {
 
     private maybeMapBlock() {
         this.sb.write(' {');
-        for (let i = 0; i < this.values.length; i++) {
-            const value = this.values[i];
+        for (let i = 0; i < this.fields.length; i++) {
+            const value = this.fields[i];
 
             if (i === 0) {
                 this.sb.writeln(`if (this == ${this.name}.${value.name} && ${value.name} != null) {`, 2);
@@ -276,9 +223,9 @@ class MethodGenerator {
     private mapOrNullBlock() {
         this.sb.write(' {');
         this.sb.writeln('switch (this) {', 2);
-        for (const value of this.values) {
-            this.sb.writeln(`case ${this.name}.${value.name}:`, 3);
-            this.sb.writeln(`return ${value.name}?.call(this);`, 4);
+        for (const field of this.fields) {
+            this.sb.writeln(`case ${this.name}.${field.name}:`, 3);
+            this.sb.writeln(`return ${field.name}?.call(this);`, 4);
         }
         this.sb.writeln('}', 2);
         this.sb.writeln('}', 1);

@@ -1,22 +1,16 @@
-import { ArgumentElement } from './element';
+import { regexp } from '../utils/regexp';
+import { ParameterElement } from './element';
 
-export default class Argument implements ArgumentElement {
-    name: string;
-    type: string;
-    value: string;
+export default class Argument implements ParameterElement {
+    name: string = '';
+    type: string = '';
+    value: string = '';
     nullable: boolean = false;
     isRequired: boolean = false;
     isNamed: boolean = false;
     isOptional: boolean = false;
     isPositional: boolean = false;
-    defaultValue: string;
-
-    constructor(name: string, type: string) {
-        this.name = name;
-        this.type = type;
-        this.value = '';
-        this.defaultValue = '';
-    }
+    defaultValue: string = '';
 
     static fromString(input?: string): Argument[] {
         return input ? argumentsFromString(input) : [];
@@ -26,39 +20,26 @@ export default class Argument implements ArgumentElement {
 /**
  * Generates arguments list from the given string. 
  * 
- * Arguments must be wrapped by parentheses `"(...)"` as string.
- * @param {string} text a valid Dart constructor with arguments as `string`.
+ * Arguments string must contains constructor parentheses `"(...)"` to be processed
+ * otherwise returns the empty list.
+ * @param {string} input a valid Dart constructor with arguments as `string`.
  * @returns a list Argument[].
  */
-const argumentsFromString = (input: string): Argument[] => {
+function argumentsFromString(input: string): Argument[] {
+    if (!hasParams(input)) return [];
+
     const parameters: Argument[] = [];
-    const body = input.slice(input.indexOf('(') + 1, input.indexOf(')')).trim();
-    const brackets = /{|}|\[|\]/gm;
-    const curlyBrackets = /{|}/gm;
-    const squareBrackets = /\[|\]/gm;
+    const group = getParams(input, { group: true });
 
-    if (!body.length) {
-        return [];
-    }
+    if (!group.length) return [];
 
-    const allParams = body.split(',').map((e) => e.match(brackets) ?
-        e.replace(brackets, '').trim() :
-        e.trim()
-    );
+    const params = getAllParamsWithoutBrackets(group);
+    const namedParams = getNamedParams(group);
+    const positionalParams = getPositionalParams(group);
 
-    const namedParams = body.match(curlyBrackets) ?
-        body.slice(body.indexOf('{') + 1, body.indexOf('}'))
-            .split(',')
-            .map((e) => e.trim()) : [];
-
-    const positionalParams = body.match(squareBrackets) ?
-        body.slice(body.indexOf('[') + 1, body.indexOf(']'))
-            .split(',')
-            .map((e) => e.trim()) : [];
-
-    for (let i = 0; i < allParams.length; i++) {
-        const line = allParams[i];
-        const parameter = new Argument('', '');
+    for (let i = 0; i < params.length; i++) {
+        const line = params[i];
+        const parameter = new Argument();
 
         if (namedParams.length) {
             if (namedParams.includes(line)) {
@@ -108,24 +89,42 @@ const argumentsFromString = (input: string): Argument[] => {
     }
 
     return parameters.sort((a, b) => Number(a.isOptional) - Number(b.isOptional));
-};
+}
 
-export function constructorBuilder(input: string, prefix = 'this.'): string {
-    const empty = /^\(\s*\)$/i;
-    const brackets = /{|}|\[|\]|\(|\)/g;
+function getPositionalParams(input: string): string[] {
+    const match = /\[(.*)\]/;
+    if (!match.test(input)) return [];
+    return match.exec(input)![1].split(',').map((e) => e.trim());
+}
 
-    if (!input.match(empty) || !input.length) { return '()'; }
+function getNamedParams(input: string): string[] {
+    const match = /\{(.*)\}/;
+    if (!match.test(input)) return [];
+    return match.exec(input)![1].split(',').map((e) => e.trim());
+}
 
-    const types = input.split(',')
-        .map((e) => e.match(brackets) ?
-            e.replace(brackets, '').trim() :
-            e.trim())
-        .join()
-        .split(/\s|,/gm)
-        .filter((_, i) => i % 2 === 0)
-        .map((t) => t + ' ')
-        .map((t) => t.includes('?') ? t.replace('?', '\\?') : t);
-    const search = new RegExp(types.join('|'), 'gm');
+function getAllParamsWithoutBrackets(input: string): string[] {
+    const match = /\{|\}|\[|\]/g;
+    return input.replace(match, '').split(',').map((e) => e.trim());
+}
 
-    return input.replace(search, prefix);
+export function hasParams(input: string): boolean {
+    return regexp.paramsMatch.test(input);
+}
+
+/**
+ * Returns string match with parentheses `"(...)"`.
+ * If the group is `true` returns group from the inside parentheses
+ * @param input a string to check given matches.
+ * @param option output option.
+ * @returns a processed string on match otherwise given string.
+ */
+function getParams(input: string, option?: { group: boolean }): string {
+    if (!hasParams(input)) return input;
+    if (option?.group) return regexp.paramsMatch.exec(input)![1].trim();
+    return regexp.paramsMatch.exec(input)![0].trim();
+}
+
+function getWithoutParams(input: string): string {
+    return input.replace(regexp.paramsMatch, '');
 }

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { ClassElement, FieldElement, Element } from '../element/element';
-import { DartCode } from './dart-code';
-import { EnumExtensionGenerator } from './enum-generator';
+import { ElementBuilder } from '../element/element-builder';
+import { ClassDataGenerator } from './class-data.generator';
+import { EnumDataGenerator } from './enum.generator';
 
 export class DartCodeActionProvider implements vscode.CodeActionProvider {
     provideCodeActions(
@@ -25,34 +25,28 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
         }
 
         const text = this.getText(document, range);
-        //const dartCode = DartCode.fromString(text).split();
+        const element = ElementBuilder.fromString(text).buildElement();
 
-        // if (dartCode.length < 2) {
-        //     return null;
-        // }
-
-        let dartCode: string;
-
-        try {
-            dartCode = new EnumExtensionGenerator(element).generate();
-        } catch (e) {
-            dartCode = `${e}`;
+        if (element === undefined) {
+            return null;
         }
+
+        const dartCode = new EnumDataGenerator(element).generateExtension();
+        const classCode = new ClassDataGenerator(element).generateSubclasses();
 
         const fix = new vscode.CodeAction('Generate Union Data', vscode.CodeActionKind.QuickFix);
         fix.edit = new vscode.WorkspaceEdit();
         // Marking a single fix as `preferred` means that users can apply it with a
         // single keyboard shortcut using the `Auto Fix` command.
         fix.isPreferred = true;
-        fix.edit.insert(document.uri, new vscode.Position((document.lineCount + 1), 0), dartCode);
+        fix.edit.insert(document.uri, new vscode.Position((document.lineCount + 1), 0), classCode);
 
         return fix;
     }
 
     private containsClassSyntax(document: vscode.TextDocument, range: vscode.Range): boolean {
-        const validText = /^\s*(abstract\s+class\s+|class\s+|enum\s+)([A-Z_$][A-Za-z0-9_$]+)(.*{.*$|^}$|.*}$)/g;
+        const validText = /^\s*(abstract\s+class\s+|class\s+|enum\s+)([A-Z_$][A-Za-z0-9_$]+)(.*{.*$|^}$|.*}$)/;
         const textLine = document.lineAt(range.start.line).text;
-
         return textLine.match(validText) !== null;
     }
 

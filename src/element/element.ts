@@ -1,33 +1,40 @@
+
+export enum ClassDeclarations { class, abstract, enhancedEnum }
+export enum ConstructorTypes { default, factory, named }
+export enum ElementKind { undefined, class, enum, constructor, getter, setter, primitive }
+
 export interface ClassElement {
     name: string,
     displayName: string,
     documentationComment?: string,
-    isEnum: boolean,
-    isAbstract: boolean,
-    genericType?: GenericType,
+    kind: ElementKind,
+    declaration: ClassDeclarations,
+    generic?: GenericTypeElement,
+    constructors: ConstructorElement[],
     fields: FieldElement[],
-    elementConstructor?: Element,
 }
 
 export interface FieldElement {
     name?: string,
-    displayName?: string,
     documentationComment?: string,
     isConst: boolean,
-    isConstructor: boolean,
     isPrivate: boolean,
-    isFactory: boolean,
-    subclassName?: string,
+    kind: ElementKind,
     element: Element;
 }
 
 export interface Element {
     name: string,
     displayName: string,
-    arguments: ArgumentElement[],
+    parameters: ParameterElement[],
 }
 
-export interface ArgumentElement {
+export interface ConstructorElement extends Element {
+    type: ConstructorTypes,
+    subclass?: string,
+}
+
+export interface ParameterElement {
     name: string,
     type: string,
     value?: string,
@@ -39,8 +46,12 @@ export interface ArgumentElement {
     defaultValue?: string,
 }
 
+export interface GenericTypeElement {
+    types: GenericType[],
+    displayName: string,
+}
+
 export type GenericType = {
     type: string,
-    displayName: string,
-    extendsTo?: string,
+    extendableType?: string,
 };

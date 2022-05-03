@@ -1,146 +1,121 @@
-import Argument from './argument';
-import { ClassElement, Element, FieldElement } from './element';
+//import { } from 'utils/string-apis';
+import { regexp } from '../utils/regexp';
+import { trim } from '../utils/string-apis';
+import { hasParams } from './argument';
+import ClassData from './class.data';
+import { ConstructorData, isNamedConstructor } from './constructor.data';
+import { FieldData } from './field-data';
 
-class ElementBuilder {
-    private input: string;
+export class ElementBuilder {
+    constructor(private readonly code: string) { }
 
-    constructor(input: string) {
-        this.input = input;
+    static fromString(code: string): ElementBuilder {
+        return new ElementBuilder(code);
     }
 
-    static fromString(input: string): ElementBuilder {
-        return new ElementBuilder(input);
+    buildElement(): ClassData | undefined {
+        const split = codeSplit(this.code);
+        return buildFromSplit(split);
     }
-
 }
 
-const data = (split: string[]): ClassElement | undefined => {
-    const isEnum = split[0].trimStart().startsWith('enum ');
-    const isAbstract = split[0].trimStart().startsWith('abstract ');
-    const displayName = split[0].slice(split[0].indexOf('class') + 5).trim();
-    const isGeneric = displayName.includes('<') && displayName.includes('>');
-    const generic = isGeneric ? displayName.slice(displayName.indexOf('<'), displayName.indexOf('>') + 1) : '';
-    const className = isGeneric ? displayName.replace(generic, '') : displayName;
-    const fields: FieldElement[] = [];
+function buildFromSplit(split: string[]): ClassData | undefined {
+    if (!split.length) return;
+    const element = new ClassData(split[0]);
 
-    if (isEnum) {
-        for (let i = 0; i < split.length; i++) {
-            const field = split[i];
-            const values = field[1].split(',');
-
-            for (const name in values) {
-                const fieldElement: FieldElement = {
-                    name: name,
-                    isConst: false,
-                    isConstructor: false,
-                    isPrivate: false,
-                    isFactory: false,
-                    element: {
-                        name: name,
-                        displayName: name,
-                        arguments: []
-                    },
-                };
-
-                fields.push(fieldElement);
-            }
-
-            return {
-                name: className,
-                displayName: displayName,
-                isAbstract: isAbstract,
-                isEnum: isEnum,
-                fields: fields,
-            } as ClassElement;
+    // Handle enum data.
+    if (element.isEnum) {
+        for (const value of element.enumValues) {
+            const field = new FieldData('', value);
+            element.addField(field);
         }
-    } else {
-        for (let i = 0; i < split.length; i++) {
-            const field = split[i];
-            const isConst = field.includes('const ');
-            const isFactory = field.includes('factory ');
-            const argument = field.match(/\(.*\)/gm)?.join();
-            const isPrivate = field.match(/ _\w*|\._\(.*\)/gm) !== null;
-            const isConstructor = field.includes(className) && argument !== undefined && !isFactory;
 
-            const fieldElement: FieldElement = {
-                name: undefined,
-                documentationComment: undefined,
-                isConst: isConst,
-                isConstructor: isConstructor,
-                isPrivate: isPrivate,
-                isFactory: isFactory,
-                element: {
-                    name: 'value',
-                    displayName: 'value',
-                    arguments: Argument.fromString(argument),
-                }
-            };
+        return element;
+    }
 
-            fields.push(fieldElement);
+    // Handle fields and constructors.
+    for (let i = 0; i < split.length; i++) {
+        const field = split[i];
+        const containsAnyConstructor = isNamedConstructor(field) && field.includes(element.name) ||
+            field.includes(element.name) && hasParams(field);
 
-            return {
-                name: className,
-                displayName: displayName,
-                documentationComment: undefined,
-                isAbstract: isAbstract,
-                isEnum: isEnum,
-                genericType: isGeneric ? {
-                    type: generic.replace(/<|>/g, '').split(' ')[0],
-                    displayName: generic,
-                    extendsTo: generic.includes(' extends ') ?
-                        generic.split(' ').splice(-1)[0].slice(0, -1) :
-                        undefined,
-                } : undefined,
-                fields: fields,
-                elementConstructor: undefined,
-            } as ClassElement;
+        if (containsAnyConstructor) {
+            const constructor = new ConstructorData(element, field);
+            element.addConstructor(constructor);
         }
     }
-};
 
-const split = (content: string, isEnum: boolean): string[] => {
+    // TODO: remove test.
+    console.log(element);
+    return element;
+}
+
+/**
+ * A function that divides data classes into strings.
+ * @param {string} content Dart language data class string.
+ * @returns a string list.
+ */
+function codeSplit(content: string): string[] {
+    const isEnum = content.trimStart().startsWith('enum ');
     const start = 0;
     const end = isEnum ?
         content.indexOf('}') + 1 :
         content.indexOf('\n}\n') + 1;
-    const comments = /(\/.*)|(\*.*)/gm;
-    const empty = '';
-    const toLine = (e: string): string => e.replace(/\n/gm, empty);
-    const fixParentheses = (l: string): string => l.replace('( ', '(').replace(', )', ')');
-    const fixCurlyBracket = (l: string): string => l.replace('{ ', '{').replace(', }', '}');
-    const fixBrackets = (l: string): string => l.replace('[ ', '[').replace(', ]', ']');
-    const fixSpaces = (l: string): string => l.replace(/\s{2,}/gm, ' ');
-    const unwantedCharacters = (l: string): boolean => !l.match(/^$|^}$/i);
-    // Clean all unwanted characters which contradict the dart language syntax.
-    const cleanUnwantedCharacters = (l: string): string => {
-        if (l.includes('return ')) {
-            if (l.match(/\{|\}/gmi)) {
-                return l.replace(/\{|\}/gmi, empty);
-            }
-        }
-
-        if (l.trimStart().startsWith('}')) {
-            return l.replace('}', empty).trim();
-        }
-
-        if (l.trimEnd().endsWith('}')) {
-            return l.replace('}', empty).trim();
-        }
-
-        return l;
-    };
+    // Split data class properties into the one line with valid syntax.
     const body = content.slice(start, end)
-        .replace(comments, empty)
+        // Clean all comments.
+        .replace(regexp.commentsMatch, '')
+        // Separate class head from the body. Gets on index 0.
         .replace('{', ';');
     const split = body.split(';')
-        .map(toLine)
+        .map(toOneLine)
         .map(fixSpaces)
-        .map(fixParentheses)
-        .map(fixCurlyBracket)
-        .map(fixBrackets)
+        .map(fixParenthesesSyntax)
+        .map(fixCurlyBracketsSyntax)
+        .map(fixBracketsSyntax)
         .map(cleanUnwantedCharacters)
-        .filter(unwantedCharacters)
-        .map((l) => l.trim());
+        .filter(Boolean)
+        .map(trim);
+    // Combine the enum name and values into a single line
+    // by adding a `+` separator to separate them later.
+    return isEnum ? [`${split[0]}+${split[1]}`, ...split.slice(2)] : split;
+}
 
-    return split;
-};
+function toOneLine(input: string): string {
+    return input.replace(/\n/g, '');
+}
+
+function fixParenthesesSyntax(line: string): string {
+    return line.replace('( ', '(').replace(', )', ')');
+}
+function fixCurlyBracketsSyntax(line: string): string {
+    return line.replace('{ ', '{').replace(', }', '}');
+}
+
+function fixBracketsSyntax(line: string): string {
+    return line.replace('[ ', '[').replace(', ]', ']');
+}
+
+function fixSpaces(line: string): string {
+    return line.replace(/\s{2,}/g, ' ');
+}
+
+// Clean all unwanted characters which contradict the dart language syntax.
+function cleanUnwantedCharacters(line: string): string {
+    const startsWithCluryBracket = /^\s*\}/;
+    const cluryBracket = /\{|\}/g;
+
+    if (line.includes('return ')) {
+        if (cluryBracket.test(line)) {
+            return line.replace(cluryBracket, '').trim();
+        }
+    }
+
+    if (startsWithCluryBracket.test(line)) {
+        return line.replace(startsWithCluryBracket, '').trim();
+    }
+
+    if (line.endsWith('}')) return line.replace('}', '').trim();
+
+    return line;
+}
