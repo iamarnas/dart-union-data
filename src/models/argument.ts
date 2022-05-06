@@ -1,11 +1,11 @@
+import { ParameterElement } from '../element/element';
 import { regexp } from '../utils/regexp';
-import { ParameterElement } from './element';
 
 export default class Argument implements ParameterElement {
     name: string = '';
     type: string = '';
     value: string = '';
-    nullable: boolean = false;
+    isNullable: boolean = false;
     isRequired: boolean = false;
     isNamed: boolean = false;
     isOptional: boolean = false;
@@ -14,6 +14,31 @@ export default class Argument implements ParameterElement {
 
     static fromString(input?: string): Argument[] {
         return input ? argumentsFromString(input) : [];
+    }
+
+    /** 
+     * Immutatable value.
+     * @example
+     * ```dart
+     * // Format.
+     * final String name
+     * ```
+     */
+    get finalVariable(): string {
+        const isNull = !this.isRequired && this.isOptional && !this.isNullable ? '?' : '';
+        return `final ${this.type}${isNull} ${this.name}`;
+    }
+
+    /** 
+     * Mutable value.
+     * @example
+     * ```dart
+     * // Format.
+     * String name
+     * ```
+     */
+    get variable(): string {
+        return `${this.type} ${this.name}`;
     }
 }
 
@@ -58,7 +83,7 @@ function argumentsFromString(input: string): Argument[] {
                 parameter.name = split[1];
                 parameter.isNamed = true;
                 parameter.isOptional = true;
-                parameter.nullable = split[0].includes('?');
+                parameter.isNullable = split[0].includes('?');
             }
         }
 
@@ -74,7 +99,7 @@ function argumentsFromString(input: string): Argument[] {
                 parameter.type = split[0];
                 parameter.isOptional = true;
                 parameter.isPositional = true;
-                parameter.nullable = split[0].includes('?') ?? false;
+                parameter.isNullable = split[0].includes('?') ?? false;
             }
         }
 
@@ -82,7 +107,7 @@ function argumentsFromString(input: string): Argument[] {
             const split = line.split(' ');
             parameter.name = split[1];
             parameter.type = split[0];
-            parameter.nullable = split[0].includes('?') ?? false;
+            parameter.isNullable = split[0].includes('?') ?? false;
         }
 
         parameters.push(parameter);

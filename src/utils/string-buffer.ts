@@ -7,12 +7,21 @@ interface StringSink {
     write(object: unknown): void;
 
     /**
-     * Iterates over the given [objects] and [write]s them in sequence. 
-     * @param objects which will be written in sequence.
-     * @param separator the default separator is `""`
-     * @param tabs adds tab before value.
+     * Iterates over the given objects and writes them in sequence. 
+     * @param objects which will be written in block.
+     * @param {string} separator the default separator is `""`
+     * @param {number} tabs adds tab before object.
      */
     writeAll(objects: unknown[], separator?: string, tabs?: number): void;
+
+    /**
+     * Iterates over the given objects and writes them in the new line as a block. 
+     * Unlike `writeAll`, suffix adds to every object.
+     * @param objects which will be written in block.
+     * @param {string} suffix additional decoration after the object. 
+     * @param {number} tabs adds tab before object.
+     */
+    writeBlock(objects: unknown[], suffix: string, tabs?: number): void
 
     /**
      * 
@@ -43,7 +52,7 @@ export class StringBuffer implements StringSink {
      * Convenience getter to determine whether the current content is empty.
      */
     get isEmpty(): boolean {
-        return this.length === 0;
+        return this.content === '';
     }
 
     /**
@@ -60,6 +69,12 @@ export class StringBuffer implements StringSink {
     writeAll(objects: unknown[], separator = '', tabs?: number): void {
         const object = (e: unknown): string => `${addTabs(tabs)}${e}`;
         this.content += objects.map(object).join(separator);
+    }
+
+    writeBlock(objects: unknown[], suffix = '', tabs?: number): void {
+        for (const object of objects) {
+            this.writeln(`${object}${suffix}`, tabs);
+        }
     }
 
     writeln(object?: unknown, tabs?: number): void {

@@ -1,10 +1,9 @@
-//import { } from 'utils/string-apis';
 import { regexp } from '../utils/regexp';
 import { trim } from '../utils/string-apis';
-import { hasParams } from './argument';
-import ClassData from './class.data';
-import { ConstructorData, isNamedConstructor } from './constructor.data';
-import { FieldData } from './field-data';
+import { FieldData } from '../models/field-data';
+import ClassData from '../models/class.data';
+import { ConstructorData, isNamedConstructor } from '../models/constructor.data';
+import { hasParams } from '../models/argument';
 
 export class ElementBuilder {
     constructor(private readonly code: string) { }

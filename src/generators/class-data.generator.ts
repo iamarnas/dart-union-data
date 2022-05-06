@@ -1,7 +1,9 @@
-import ClassData from '../element/class.data';
-import { ConstructorData } from '../element/constructor.data';
 import { ConstructorTypes, FieldElement } from '../element/element';
+import ClassData from '../models/class.data';
+import { ConstructorData } from '../models/constructor.data';
 import { StringBuffer } from '../utils/string-buffer';
+import { CopyWithGenerator } from './copy-with.generator';
+import { MethodGenerator } from './method.generator';
 import SubclassGenerator from './subclass.generator';
 
 export class ClassDataGenerator {
@@ -33,6 +35,27 @@ export class ClassDataGenerator {
         return this.sb.toString();
     }
 
+    // TODO: test string. Should adds to the buffer.
+    generateCopyWith(): string {
+        for (const factory of this.element.factories) {
+            const coopyWith = new CopyWithGenerator(factory).generate();
+            this.sb.writeln(coopyWith);
+        }
+        return this.sb.toString();
+    }
+
+    // TODO: test string. Should adds to the buffer.
+    generateMethods() {
+        const methodGenerator = MethodGenerator.fromElement(this.element);
+        this.sb.writeln(methodGenerator.generate('map'));
+        this.sb.writeln(methodGenerator.generate('maybeMap'));
+        this.sb.writeln(methodGenerator.generate('mapOrNull'));
+        this.sb.writeln(methodGenerator.generate('when'));
+        this.sb.writeln(methodGenerator.generate('maybeWhen'));
+        this.sb.writeln(methodGenerator.generate('whenOrNull'));
+        return this.sb.toString();
+    }
+
     private writeIsChecker() {
         this.sb.writeln();
         for (const constructor of this.element.factories) {
@@ -42,7 +65,7 @@ export class ClassDataGenerator {
 
     private isChecker(e: ConstructorData): string {
         const name = e.name.trimStart()[0].toUpperCase() + e.name.slice(1);
-        return `bool get is${name} => this is ${e.subclassWithGeneric};`;
+        return `bool get is${name} => this is ${e.displayType};`;
     }
 
     private writeAsChecker() {
@@ -54,7 +77,7 @@ export class ClassDataGenerator {
 
     private asChecker(e: ConstructorData): string {
         const name = e.name.trimStart()[0].toUpperCase() + e.name.slice(1);
-        return `${e.subclassWithGeneric} get as${name} => this as ${e.subclassWithGeneric};`;
+        return `${e.displayType} get as${name} => this as ${e.displayType};`;
     }
 
     private writeAsOrNullChecker() {
@@ -69,9 +92,9 @@ export class ClassDataGenerator {
 
         if (e.type === ConstructorTypes.factory) {
             this.sb.writeln();
-            this.sb.writeln(`${e.subclassWithGeneric} ? get as${name}OrNull {`, 1);
+            this.sb.writeln(`${e.displayType} ? get as${name}OrNull {`, 1);
             this.sb.writeln(`final ${className} = this;`, 2);
-            this.sb.writeln(`return ${className} is ${e.subclassWithGeneric} ? ${className} : null;`, 2);
+            this.sb.writeln(`return ${className} is ${e.displayType} ? ${className} : null;`, 2);
             this.sb.writeln('}', 1);
         }
     }

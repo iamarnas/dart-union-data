@@ -38,7 +38,7 @@ export interface ParameterElement {
     name: string,
     type: string,
     value?: string,
-    nullable: boolean,
+    isNullable: boolean,
     isRequired: boolean,
     isNamed: boolean,
     isPositional: boolean,

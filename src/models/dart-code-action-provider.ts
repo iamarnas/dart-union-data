@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { ElementBuilder } from '../element/element-builder';
-import { ClassDataGenerator } from './class-data.generator';
-import { EnumDataGenerator } from './enum.generator';
+import { ClassDataGenerator } from '../generators/class-data.generator';
+import { EnumDataGenerator } from '../generators/enum.generator';
 
 export class DartCodeActionProvider implements vscode.CodeActionProvider {
     provideCodeActions(
@@ -31,15 +31,20 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
             return null;
         }
 
-        const dartCode = new EnumDataGenerator(element).generateExtension();
-        const classCode = new ClassDataGenerator(element).generateSubclasses();
+        let dartCode = '';
+
+        if (element.isEnum) {
+            dartCode = new EnumDataGenerator(element).generateExtension();
+        } else {
+            dartCode = new ClassDataGenerator(element).generateCopyWith();
+        }
 
         const fix = new vscode.CodeAction('Generate Union Data', vscode.CodeActionKind.QuickFix);
         fix.edit = new vscode.WorkspaceEdit();
         // Marking a single fix as `preferred` means that users can apply it with a
         // single keyboard shortcut using the `Auto Fix` command.
         fix.isPreferred = true;
-        fix.edit.insert(document.uri, new vscode.Position((document.lineCount + 1), 0), classCode);
+        fix.edit.insert(document.uri, new vscode.Position((document.lineCount + 1), 0), dartCode);
 
         return fix;
     }

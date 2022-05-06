@@ -22,5 +22,9 @@ function trim(intput: string): string {
     return intput.trim();
 }
 
-export { join, zip, trim };
+function firstLetterToLowerCase(input: string) {
+    return input.charAt(0).toLowerCase() + input.slice(1);
+}
+
+export { join, zip, trim, firstLetterToLowerCase };
 

@@ -1,5 +1,5 @@
-import ClassData from '../element/class.data';
 import { FieldElement } from '../element/element';
+import ClassData from '../models/class.data';
 import { StringBuffer } from '../utils/string-buffer';
 import { MethodGenerator } from './method.generator';
 

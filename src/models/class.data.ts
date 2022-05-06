@@ -3,12 +3,14 @@ import { trim } from '../utils/string-apis';
 import { hasParams } from './argument';
 import { ConstructorData } from './constructor.data';
 import {
-    ClassDeclarations,
-    ClassElement, ConstructorTypes, ElementKind,
+    ClassElement,
+    GenericTypeElement,
+    ElementKind,
     FieldElement,
+    ConstructorTypes,
+    ClassDeclarations,
     GenericType,
-    GenericTypeElement
-} from './element';
+} from '../element/element';
 
 export default class ClassData implements ClassElement {
     readonly name: string = '';
@@ -82,6 +84,34 @@ export default class ClassData implements ClassElement {
         }
     }
 
+    /** 
+     * Global generic type for all subclasses without extendable types.
+     * Uses for types.
+     * @example
+     * ```dart
+     * // Instead:
+     * <T extends Object?>;
+     * // Returns:
+     * <T>;
+     * ```
+     */
+    get genericType(): string {
+        const types = this.generic?.types;
+        if (!types) return '';
+        const generic = types.map((e) => e.type).join(', ');
+        return `<${generic}>`;
+    }
+
+    /** The element type.
+     * @example
+     * ```dart
+     * Result<T> result;
+     * ```
+     */
+    get displayType(): string {
+        return this.name + this.genericType;
+    }
+
     addField(field: FieldElement) {
         this.fields.push(field);
     }
@@ -109,7 +139,7 @@ export function getWithoutGenericType(input: string): string {
     return input.replace(regexp.genericsMatch, '');
 }
 
-function getGenericType(input: string, option?: { group: boolean }): string {
+export function getGenericType(input: string, option?: { group: boolean }): string {
     if (!hasGenericType(input)) return input;
     if (option?.group) return regexp.genericsMatch.exec(input)![1].trim();
     return regexp.genericsMatch.exec(input)![0].trim();

@@ -38,10 +38,10 @@ class RegExpManager {
     /** 
      * Checks if it matches the subclass.
      * 
-     * - To get a subclass name use group 2.
-     * - To get a generic type use group 3. Returns `null` if no match occurs
+     * - To get a subclass name use group 1.
+     * - To get a generic type use group 2.
      */
-    readonly subclassMatch = /(=\s+|return\s+)([A-Z_]\w*)(\<\D+\>|\s*)/;
+    readonly subclassMatch = /=\s+([A-Z_]\w*)(\<\D+\>|\s*)/;
 
     /** Combine several RegExp into one. */
     readonly combine = (...regexes: RegExp[]): RegExp => {

@@ -1,5 +1,5 @@
 import { regexp } from '../utils/regexp';
-import { Element, ElementKind, FieldElement } from './element';
+import { Element, ElementKind, FieldElement } from '../element/element';
 
 export class FieldData implements FieldElement {
     readonly name?: string;
