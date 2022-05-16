@@ -1,30 +1,43 @@
-/**
- * Adds all the elements of an array into a string, separated by the specified separator string.
- * If the separator has the next line `\n`, the separator will be added after the last value.
- * @param args arguments for separation.
- * @param separator A string is used to separate one element of the array from the next in the resulting string.
- * If omitted, the array elements are separated with a comma.
- * @returns a string.
- */
-function join<T>(args: T[], separator?: string): string {
-    const newln = separator?.includes('\n') ?? false;
-    const start = newln ? '\n' : '';
-    const end = newln ? separator : '';
-    return `${start}${args.join(separator)}${end}`;
+
+declare global {
+    interface String {
+        decapitalize(): string;
+        capitalize(): string;
+        isBlack(): boolean;
+        isNotBlack(): boolean;
+    }
 }
 
+String.prototype.decapitalize = function (): string {
+    return decapitalize(String(this));
+};
+
+String.prototype.capitalize = function (): string {
+    return capitalize(String(this));
+};
+
+String.prototype.isBlack = function (): boolean {
+    return (/^\s*$/).test(String(this));
+};
+
+String.prototype.isNotBlack = function (): boolean {
+    return !(/^\s*$/).test(String(this));
+};
+
 function zip<L, R>(left: L[], right: R[], separator?: string, divider = ' '): string {
-    const values = left.map((e, i) => `${e}${divider}${right[i]}`);
-    return join(values, separator);
+    return left.map((e, i) => `${e}${divider}${right[i]}`).join(separator);
 }
 
 function trim(intput: string): string {
     return intput.trim();
 }
 
-function firstLetterToLowerCase(input: string) {
+function decapitalize(input: string) {
     return input.charAt(0).toLowerCase() + input.slice(1);
 }
 
-export { join, zip, trim, firstLetterToLowerCase };
+function capitalize(input: string) {
+    return input.charAt(0).toUpperCase() + input.slice(1);
+}
 
+export { zip, trim };

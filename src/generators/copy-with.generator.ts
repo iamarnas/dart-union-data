@@ -1,19 +1,19 @@
 import Argument from '../models/argument';
 import { ConstructorData } from '../models/constructor.data';
-import { StringBuffer } from '../utils/string-buffer';
+import StringBuffer from '../utils/string-buffer';
 
 export class CopyWithGenerator {
     private readonly implementationType: string;
     private readonly className: string;
     private readonly constructorName: string;
-    private readonly parameters: Argument[] = [];
+    private readonly arguments: Argument[] = [];
     private sb: StringBuffer = new StringBuffer();
 
     constructor(private readonly element: ConstructorData) {
         this.implementationType = element.displayType;
         this.className = element.subclass + 'CopyWith' + element.genericType;
         this.constructorName = element.subclass + 'CopyWith';
-        this.parameters = element.parameters;
+        this.arguments = element.arguments;
     }
 
     static fromElement(element: ConstructorData): CopyWithGenerator {
@@ -33,15 +33,15 @@ export class CopyWithGenerator {
     }
 
     private get params(): string[] {
-        return this.parameters.map((e) => e.variable);
+        return this.arguments.map((e) => e.typeAndName);
     }
 
     private get copyWithParams(): string[] {
-        return this.parameters.map((e) => `Object? ${e.name} = _undefined`);
+        return this.arguments.map((e) => `Object? ${e.name} = _undefined`);
     }
 
     private get copyWithCallbacks(): string[] {
-        return this.parameters.map((e) => {
+        return this.arguments.map((e) => {
             const prefix = e.isNamed ? `${e.name}: ` : '';
 
             if (e.name === 'value') {

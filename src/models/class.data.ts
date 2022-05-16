@@ -1,27 +1,27 @@
-import { regexp } from '../utils/regexp';
-import { trim } from '../utils/string-apis';
-import { hasParams } from './argument';
-import { ConstructorData } from './constructor.data';
 import {
+    ClassDeclarations,
     ClassElement,
-    GenericTypeElement,
+    ConstructorTypes,
     ElementKind,
     FieldElement,
-    ConstructorTypes,
-    ClassDeclarations,
     GenericType,
-} from '../element/element';
+    GenericTypeElement
+} from '../interface/element';
+import { hasConstructor } from '../shared/argument-extractor';
+import regexp from '../utils/regexp';
+import { trim } from '../utils/string-apis';
+import { ConstructorData } from './constructor.data';
 
-export default class ClassData implements ClassElement {
+export class ClassData implements ClassElement {
     readonly name: string = '';
     readonly displayName: string = '';
-    readonly documentationComment?: string;
+    readonly doc?: string;
     readonly generic?: GenericTypeElement;
     readonly kind: ElementKind = ElementKind.class;
     readonly constructors: ConstructorData[] = [];
     readonly fields: FieldElement[] = [];
-    /** Enum values for faster access. */
-    readonly enumValues: string[] = [];
+    /** Enum members for faster access. */
+    readonly enumMembers: string[] = [];
 
     constructor(private readonly field: string) {
         // Start index, suitable for class and enum.
@@ -29,7 +29,7 @@ export default class ClassData implements ClassElement {
 
         if (this.isAbstract || this.startsWithClass) {
             const displayName = field.slice(start).trim();
-            this.displayName = displayName;
+            this.displayName = getDisplayName(displayName);
             this.name = getWithoutGenericType(displayName);
             this.generic = getGenericsElement(displayName);
         }
@@ -40,11 +40,11 @@ export default class ClassData implements ClassElement {
             // The split returns `["enum EnumName", "value1, value2, value3"]`.
             const split = this.field.split('+');
             const displayName = split[0].slice(start).trim();
-            const values = split[1];
-            this.displayName = displayName;
+            const members = split[1];
+            this.displayName = getDisplayName(displayName);
             this.name = getWithoutGenericType(displayName);
             this.kind = ElementKind.enum;
-            this.enumValues = getEnumValues(values);
+            this.enumMembers = getEnumMembers(members);
         }
     }
 
@@ -66,8 +66,8 @@ export default class ClassData implements ClassElement {
     }
 
     get isEnhancedEnum(): boolean {
-        if (!this.enumValues.length) return false;
-        return this.enumValues.every(hasParams);
+        if (!this.enumMembers.length) return false;
+        return this.enumMembers.every(hasConstructor);
     }
 
     private get startsWithClass(): boolean {
@@ -85,14 +85,13 @@ export default class ClassData implements ClassElement {
     }
 
     /** 
-     * Global generic type for all subclasses without extendable types.
-     * Uses for types.
+     * The global generic type is used for interface types.
      * @example
      * ```dart
      * // Instead:
-     * <T extends Object?>;
+     * <T extends Object?>
      * // Returns:
-     * <T>;
+     * <T>
      * ```
      */
     get genericType(): string {
@@ -105,7 +104,7 @@ export default class ClassData implements ClassElement {
     /** The element type.
      * @example
      * ```dart
-     * Result<T> result;
+     * Result<T>
      * ```
      */
     get displayType(): string {
@@ -121,30 +120,46 @@ export default class ClassData implements ClassElement {
     }
 }
 
+/** Creates [GenericTypeElement] from the given string. */
 function getGenericsElement(input: string): GenericTypeElement | undefined {
     if (!hasGenericType(input)) return;
-
     return {
         types: getGenericTypes(input),
         displayName: getGenericType(input),
-    } as GenericTypeElement;
+    };
 }
 
 function hasGenericType(input: string): boolean {
     return regexp.genericsMatch.test(input);
 }
 
-export function getWithoutGenericType(input: string): string {
-    if (!hasGenericType(input)) return input;
-    return input.replace(regexp.genericsMatch, '');
+/** Returns only the class name. Can be with original generic type. */
+function getDisplayName(input: string): string {
+    const match = /implements|with|mixin|extends/g;
+    if (!match.test(input)) return input;
+    return input.replace(match, '%').split('%')[0].trim();
 }
 
+/** Removes generics type from the given string. */
+export function getWithoutGenericType(input: string): string {
+    const name = getDisplayName(input);
+    if (!hasGenericType(name)) return name;
+    return name.replace(regexp.genericsMatch, '');
+}
+
+/**
+ * Extracts generic type from the given string.
+ * @param input the given stringthe given string to process.
+ * @param option allows extracting generic type instance without angle brackets if the `group` is `true`.
+ * @returns a string.
+ */
 export function getGenericType(input: string, option?: { group: boolean }): string {
     if (!hasGenericType(input)) return input;
     if (option?.group) return regexp.genericsMatch.exec(input)![1].trim();
     return regexp.genericsMatch.exec(input)![0].trim();
 }
 
+/** Converts generic type from the given string into an object. */
 function getGenericTypes(input: string): GenericType[] {
     if (!hasGenericType(input)) return [];
     const generics = getGenericType(input, { group: true });
@@ -158,14 +173,15 @@ function getGenericTypes(input: string): GenericType[] {
             return {
                 type: type,
                 extendableType: extendableType,
-            } as GenericType;
+            };
         }
 
-        return { type: element } as GenericType;
+        return { type: element };
     });
 }
 
-function getEnumValues(values?: string): string[] {
+/** Extracts enum members from the given string. */
+function getEnumMembers(values?: string): string[] {
     if (!values) return [];
     return values.split(',').map(trim).filter(Boolean);
 }

@@ -1,19 +1,25 @@
-import { ConstructorElement, ConstructorTypes } from '../element/element';
-import { regexp } from '../utils/regexp';
+import { ConstructorElement, ConstructorTypes } from '../interface/element';
+import { extractArguments } from '../shared/argument-extractor';
+import regexp from '../utils/regexp';
 import Argument from './argument';
-import ClassData from './class.data';
-import { isConst, isFactory, isPrivate } from './field-data';
+import { ClassData } from './class.data';
+import { isConst, isFactory, isPrivate } from './field.data';
 
 export class ConstructorData implements ConstructorElement {
     type: ConstructorTypes = ConstructorTypes.default;
     name: string = '';
     displayName: string = '';
-    parameters: Argument[] = [];
 
-    constructor(private readonly element: ClassData, private readonly field: string) {
+    constructor(
+        private readonly element: ClassData,
+        private readonly field: string,
+    ) {
         this.type = getConstructorType(field);
         this.name = getConstructorName(element.name, field);
-        this.parameters = Argument.fromString(field);
+    }
+
+    get arguments(): Argument[] {
+        return extractArguments(this.field);
     }
 
     get isConst(): boolean {
@@ -28,9 +34,6 @@ export class ConstructorData implements ConstructorElement {
         return this.element.genericType;
     }
 
-    /** 
-     * Subclass name.
-     */
     get subclass(): string {
         const subclass = getSubclass(this.field);
         if (!subclass) return '';
@@ -42,7 +45,7 @@ export class ConstructorData implements ConstructorElement {
     }
 
     get callbackParams(): string {
-        return this.parameters.map((e) => `${e.type} ${e.name}`).join(', ');
+        return this.arguments.map((e) => `${e.type} ${e.name}`).join(', ');
     }
 
     /**
@@ -54,7 +57,7 @@ export class ConstructorData implements ConstructorElement {
      * ```
      */
     callbackParamsFrom(subclass: string): string {
-        return this.parameters.map((e) => `${subclass}.${e.name}`).join(', ');
+        return this.arguments.map((e) => `${subclass}.${e.name}`).join(', ');
     }
 
     /**
@@ -66,7 +69,7 @@ export class ConstructorData implements ConstructorElement {
      * ```
      */
     get toStringValue(): string {
-        const params = this.parameters.map((e) => `${e.name}: $${e.name}`).join(', ');
+        const params = this.arguments.map((e) => `${e.name}: $${e.name}`).join(', ');
         const generics = this.element.generic?.types.map((e) => `\$${e.type}`);
         const generic = !generics ? '' : `<${generics.join(', ')}>`;
         return `'${this.subclass}${generic}(${params})';`;
@@ -74,8 +77,9 @@ export class ConstructorData implements ConstructorElement {
 
     /**
      * Parameters for the class constructor are initialized with `this`.
-     * if any value is required, the `required` keyword will be added.
+     * If any value is required, the `required` keyword will be added.
      * @returns a string.
+     * @param {boolean} block adds required missing trailing comma.
      * @example
      * ```dart
      * // Required:
@@ -86,27 +90,32 @@ export class ConstructorData implements ConstructorElement {
      * '[this.name, this.id]'
      * ```
      */
-    get initValues(): string {
-        if (!this.parameters.length) return '';
-        const hasOptionalParams = this.parameters.some((e) => e.isOptional);
-
-        const params = this.parameters
+    initValues(block = false): string {
+        if (!this.arguments.length) return '';
+        // Required trailing comma.
+        const comma = block ? ',' : '';
+        const _params = this.arguments
             .filter((e) => !e.isOptional)
             .map((e) => `this.${e.name}`)
             .join(', ');
-
-        if (!hasOptionalParams) return params;
-
-        const _named = this.parameters
+        const _named = this.arguments
             .filter((e) => e.isNamed)
             .map((e) => e.isRequired ? `required this.${e.name}` : `this.${e.name}`)
             .join(', ');
-        const _positional = this.parameters
+        const _positional = this.arguments
             .filter((e) => e.isPositional)
             .map((e) => `this.${e.name}`)
             .join(', ');
-        const named = !_named.length ? '' : `{${_named}}`;
-        const positional = !_positional.length ? '' : `[${_positional}]`;
+
+        const named = _named.length !== 0
+            ? `{${_named}${comma}}`
+            : '';
+        const positional = _positional.length !== 0
+            ? `[${_positional}${comma}]`
+            : '';
+        const params = (_named.length !== 0 || _positional.length !== 0)
+            ? _params
+            : `${_params}${comma}`;
 
         return [params, named, positional].filter(Boolean).join(', ');
     }

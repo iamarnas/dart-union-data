@@ -1,7 +1,7 @@
-import { ConstructorTypes, FieldElement } from '../element/element';
-import ClassData from '../models/class.data';
+import { ConstructorTypes, FieldElement } from '../interface/element';
+import { ClassData } from '../models/class.data';
 import { ConstructorData } from '../models/constructor.data';
-import { StringBuffer } from '../utils/string-buffer';
+import StringBuffer from '../utils/string-buffer';
 import { CopyWithGenerator } from './copy-with.generator';
 import { MethodGenerator } from './method.generator';
 import SubclassGenerator from './subclass.generator';

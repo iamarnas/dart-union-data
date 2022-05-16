@@ -1,9 +1,9 @@
-import { regexp } from '../utils/regexp';
-import { trim } from '../utils/string-apis';
-import { FieldData } from '../models/field-data';
-import ClassData from '../models/class.data';
+import { ClassData } from '../models/class.data';
 import { ConstructorData, isNamedConstructor } from '../models/constructor.data';
-import { hasParams } from '../models/argument';
+import { FieldData } from '../models/field.data';
+import { hasConstructor } from '../shared/argument-extractor';
+import regexp from '../utils/regexp';
+import { trim } from '../utils/string-apis';
 
 export class ElementBuilder {
     constructor(private readonly code: string) { }
@@ -24,8 +24,8 @@ function buildFromSplit(split: string[]): ClassData | undefined {
 
     // Handle enum data.
     if (element.isEnum) {
-        for (const value of element.enumValues) {
-            const field = new FieldData('', value);
+        for (const member of element.enumMembers) {
+            const field = new FieldData('', member);
             element.addField(field);
         }
 
@@ -33,10 +33,9 @@ function buildFromSplit(split: string[]): ClassData | undefined {
     }
 
     // Handle fields and constructors.
-    for (let i = 0; i < split.length; i++) {
-        const field = split[i];
-        const containsAnyConstructor = isNamedConstructor(field) && field.includes(element.name) ||
-            field.includes(element.name) && hasParams(field);
+    for (const field of split) {
+        const containsAnyConstructor = isNamedConstructor(field) && field.includes(element.name)
+            || field.includes(element.name) && hasConstructor(field);
 
         if (containsAnyConstructor) {
             const constructor = new ConstructorData(element, field);
@@ -44,8 +43,6 @@ function buildFromSplit(split: string[]): ClassData | undefined {
         }
     }
 
-    // TODO: remove test.
-    console.log(element);
     return element;
 }
 
@@ -57,9 +54,9 @@ function buildFromSplit(split: string[]): ClassData | undefined {
 function codeSplit(content: string): string[] {
     const isEnum = content.trimStart().startsWith('enum ');
     const start = 0;
-    const end = isEnum ?
-        content.indexOf('}') + 1 :
-        content.indexOf('\n}\n') + 1;
+    const end = isEnum
+        ? content.indexOf('}') + 1
+        : content.indexOf('\n}\n') + 1;
     // Split data class properties into the one line with valid syntax.
     const body = content.slice(start, end)
         // Clean all comments.
@@ -85,14 +82,14 @@ function toOneLine(input: string): string {
 }
 
 function fixParenthesesSyntax(line: string): string {
-    return line.replace('( ', '(').replace(', )', ')');
+    return line.replace(/\(\s+/, '(').replace(/,\s*\)/, ')');
 }
 function fixCurlyBracketsSyntax(line: string): string {
-    return line.replace('{ ', '{').replace(', }', '}');
+    return line.replace(/\{\s+/, '{').replace(/,\s*\}/, '}');
 }
 
 function fixBracketsSyntax(line: string): string {
-    return line.replace('[ ', '[').replace(', ]', ']');
+    return line.replace(/\[\s+/, '[').replace(/,\s*\]/, ']');
 }
 
 function fixSpaces(line: string): string {

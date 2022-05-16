@@ -15,8 +15,7 @@ interface StringSink {
     writeAll(objects: unknown[], separator?: string, tabs?: number): void;
 
     /**
-     * Iterates over the given objects and writes them in the new line as a block. 
-     * Unlike `writeAll`, suffix adds to every object.
+     * Iterates over the given objects and writes them in the new line as a block.
      * @param objects which will be written in block.
      * @param {string} suffix additional decoration after the object. 
      * @param {number} tabs adds tab before object.
@@ -38,7 +37,7 @@ interface StringSink {
  * Allows for the incremental building of a string using `write*()` methods.
  * The strings are concatenated to a single string only when `toString` is called.
  */
-export class StringBuffer implements StringSink {
+export default class StringBuffer implements StringSink {
     constructor(private content = '') { }
 
     /**
@@ -63,12 +62,16 @@ export class StringBuffer implements StringSink {
     }
 
     write(object: unknown, tabs?: number): void {
-        this.content += `${addTabs(tabs)}${object}`;
+        if (typeof object === 'object') {
+            const obj = JSON.stringify(object);
+            this.content = this.content.concat(`${this.addTabs(tabs)}${obj}`);
+        } else {
+            this.content = this.content.concat(`${this.addTabs(tabs)}${object}`);
+        }
     }
 
     writeAll(objects: unknown[], separator = '', tabs?: number): void {
-        const object = (e: unknown): string => `${addTabs(tabs)}${e}`;
-        this.content += objects.map(object).join(separator);
+        this.write(objects.map((e) => `${this.addTabs(tabs)}${e}`).join(separator));
     }
 
     writeBlock(objects: unknown[], suffix = '', tabs?: number): void {
@@ -78,10 +81,11 @@ export class StringBuffer implements StringSink {
     }
 
     writeln(object?: unknown, tabs?: number): void {
-        if (object) {
-            this.content += `\n${addTabs(tabs)}${object}`;
+        if (!object) {
+            this.write('\n');
         } else {
-            this.content += '\n';
+            this.write('\n');
+            this.write(`${object}`, tabs);
         }
     }
 
@@ -98,17 +102,13 @@ export class StringBuffer implements StringSink {
     toString(): string {
         return this.content;
     }
-}
 
-function addTabs(tabs?: number): string {
-    if (!tabs) return '';
-    let sb = '';
-    let i = 0;
-
-    while (i < tabs) {
-        sb += '\t';
-        i++;
+    /**
+     * Returns the number of tabs according to the specified number.
+     * @param tabs a number that indicates the length of the tabs.
+     * @returns string of tabs.
+     */
+    private addTabs(tabs = 0): string {
+        return [...Array(tabs)].map(() => '\t').join('');
     }
-
-    return sb;
 }

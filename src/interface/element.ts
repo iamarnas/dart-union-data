@@ -6,7 +6,7 @@ export enum ElementKind { undefined, class, enum, constructor, getter, setter, p
 export interface ClassElement {
     name: string,
     displayName: string,
-    documentationComment?: string,
+    doc?: string,
     kind: ElementKind,
     declaration: ClassDeclarations,
     generic?: GenericTypeElement,
@@ -16,7 +16,7 @@ export interface ClassElement {
 
 export interface FieldElement {
     name?: string,
-    documentationComment?: string,
+    doc?: string,
     isConst: boolean,
     isPrivate: boolean,
     kind: ElementKind,
@@ -26,7 +26,7 @@ export interface FieldElement {
 export interface Element {
     name: string,
     displayName: string,
-    parameters: ParameterElement[],
+    arguments: ArgumentElement[],
 }
 
 export interface ConstructorElement extends Element {
@@ -34,10 +34,11 @@ export interface ConstructorElement extends Element {
     subclass?: string,
 }
 
-export interface ParameterElement {
+export interface ArgumentElement {
     name: string,
     type: string,
     value?: string,
+    isFinal: boolean,
     isNullable: boolean,
     isRequired: boolean,
     isNamed: boolean,
@@ -51,7 +52,7 @@ export interface GenericTypeElement {
     displayName: string,
 }
 
-export type GenericType = {
+export interface GenericType {
     type: string,
     extendableType?: string,
 };

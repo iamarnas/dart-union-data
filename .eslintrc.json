@@ -9,6 +9,7 @@
         "@typescript-eslint"
     ],
     "rules": {
+        "@typescript-eslint/consistent-type-assertions": "error",
         "@typescript-eslint/naming-convention": "warn",
         "@typescript-eslint/semi": "warn",
         "@typescript-eslint/array-type": [

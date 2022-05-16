@@ -1,6 +1,6 @@
-import { FieldElement } from '../element/element';
-import ClassData from '../models/class.data';
-import { StringBuffer } from '../utils/string-buffer';
+import { FieldElement } from '../interface/element';
+import { ClassData } from '../models/class.data';
+import StringBuffer from '../utils/string-buffer';
 import { MethodGenerator } from './method.generator';
 
 export class EnumDataGenerator {

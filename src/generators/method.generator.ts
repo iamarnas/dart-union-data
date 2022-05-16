@@ -1,8 +1,8 @@
-import { FieldElement } from '../element/element';
-import ClassData from '../models/class.data';
+import { FieldElement } from '../interface/element';
+import { ClassData } from '../models/class.data';
 import { ConstructorData } from '../models/constructor.data';
-import { firstLetterToLowerCase } from '../utils/string-apis';
-import { StringBuffer } from '../utils/string-buffer';
+import { } from '../utils/string-apis';
+import StringBuffer from '../utils/string-buffer';
 
 export class MethodGenerator {
     private readonly fields: FieldElement[];
@@ -16,7 +16,7 @@ export class MethodGenerator {
         this.factories = element.factories;
         this.fields = element.fields;
         this.name = element.name;
-        this.superclass = firstLetterToLowerCase(element.name);
+        this.superclass = element.name.decapitalize();
     }
 
     static fromElement(element: ClassData): MethodGenerator {
@@ -418,6 +418,9 @@ export class MethodGenerator {
                     this.sb.writeln(`return ${value.name}?.call(${this.superclass});`, 3);
                 }
             }
+
+            this.sb.writeln('} else {', 2);
+            this.sb.writeln('throw AssertionError();', 3);
         }
 
         this.sb.writeln('}', 2);
