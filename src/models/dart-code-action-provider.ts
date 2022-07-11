@@ -1,65 +1,167 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import * as vscode from 'vscode';
-import { ClassDataGenerator } from '../generators/class-data.generator';
-import { EnumDataGenerator } from '../generators/enum.generator';
-import { ElementBuilder } from '../interface/element-builder';
-import regexp from '../utils/regexp';
+import { DartCodeProvider, DartEnumDataProvider } from '../editors';
+import { ElementKind } from '../interface';
+import '../types/array';
+import '../types/string';
 
 const FORMAT_DOCUMENT = 'editor.action.formatDocument';
 const FORMAT_CHANGES = 'editor.action.formatChanges';
 
 export class DartCodeActionProvider implements vscode.CodeActionProvider {
+    code: DartCodeProvider;
+
+    constructor(public editor: vscode.TextEditor) {
+        this.code = new DartCodeProvider(editor);
+
+        vscode.window.onDidChangeTextEditorSelection((event) => {
+            this.code = new DartCodeProvider(event.textEditor);
+        });
+    }
+
     provideCodeActions(
         document: vscode.TextDocument,
         range: vscode.Range | vscode.Selection,
         context: vscode.CodeActionContext,
         token: vscode.CancellationToken,
     ): vscode.ProviderResult<Array<vscode.CodeAction | vscode.Command>> {
-        const generateUnionDataAction = this.generateUnionData(document, range);
-
-        return generateUnionDataAction === null ? [] : [generateUnionDataAction];
+        const dartCodeActions = this.dartCodeActions(document, range);
+        return !dartCodeActions ? [] : dartCodeActions;
     }
 
     public static readonly providedCodeActionKinds = [
         vscode.CodeActionKind.RefactorRewrite,
     ];
 
-    private generateUnionData(document: vscode.TextDocument, range: vscode.Range): vscode.CodeAction | null {
-        if (!this.containsClassSyntax(document, range)) return null;
-        const text = this.getText(document, range);
-        const element = ElementBuilder.fromString(text).buildElement();
-        if (element === undefined) return null;
-        let dartCode = '';
+    private dartCodeActions(document: vscode.TextDocument, range: vscode.Range): vscode.CodeAction[] | undefined {
+        const actions: vscode.CodeAction[] = [];
+        const end = new vscode.Position(
+            document.lineCount - 1,
+            document.lineAt(document.lineCount - 1).range.end.character,
+        );
 
-        // TODO: remove test.
-        console.log(element);
+        const element = this.code.element;
 
-        if (element.isEnum) {
-            dartCode = new EnumDataGenerator(element).generateExtension();
-        } else {
-            dartCode = new ClassDataGenerator(element).generateSubclasses();
+        if (!element || !this.code.range) return;
+
+        if (element.kind === ElementKind.enum) {
+            const enumCode = new DartEnumDataProvider(this.code, element);
+            const enumExtensionRange = enumCode.extensionRange();
+            const enumCheckersRange = enumCode.checkersRange();
+            const enumMethodsRange = enumCode.methodsRange();
+
+            if (enumCode.isEmpty) return;
+
+            if (element.isEnhancedEnum) {
+                if (!this.code.contains(enumCheckersRange) && !this.code.contains(enumMethodsRange)) {
+                    actions.push(this.insertFix(document, this.code.endPositionWithinCode(), 'Generate Enum Data', enumCode.checkersAndMethods()));
+                }
+
+                if (!this.code.contains(enumCheckersRange)) {
+                    actions.push(this.insertFix(document, this.code.endPositionWithinCode(), 'Generate Enum Checkers', '\n' + enumCode.checkers() + '\n'));
+                }
+
+                if (!this.code.contains((enumMethodsRange))) {
+                    actions.push(this.insertFix(document, this.code.endPositionWithinCode(), 'Generate Enum Methods', '\n' + enumCode.methods() + '\n'));
+                }
+
+                if (enumCheckersRange && !enumCode.hasEqualCheckers) {
+                    actions.push(this.replaceFix(document, enumCheckersRange, 'Update Enum Checkers', enumCode.checkers()));
+                }
+
+                if (enumMethodsRange && !enumCode.hasEqualMethods) {
+                    actions.push(this.replaceFix(document, enumMethodsRange, 'Update Enum Methods', enumCode.methods()));
+                }
+
+                return actions;
+            }
+
+            if (!this.code.contains(enumExtensionRange)) {
+                const spacing = document.lineAt(end.line).isEmptyOrWhitespace ? '\n' : '\n\n';
+                actions.push(this.insertFix(document, end, 'Generate Enum Extension', spacing + enumCode.extension() + '\n'));
+            }
+
+            if (enumExtensionRange && !enumCode.hasEqualExtension) {
+                actions.push(this.replaceFix(document, enumExtensionRange, 'Update Enum Extension', enumCode.extension()));
+            }
+
+            return actions;
         }
 
-        const fix = new vscode.CodeAction('Generate Union Data', vscode.CodeActionKind.QuickFix);
-        fix.edit = new vscode.WorkspaceEdit();
-        // Marking a single fix as `preferred` means that users can apply it with a
-        // single keyboard shortcut using the `Auto Fix` command.
-        fix.isPreferred = true;
-        fix.edit.insert(document.uri, new vscode.Position((document.lineCount + 1), 0), dartCode);
+        if (element.kind === ElementKind.class) {
+            const dartCode = this.code.data;
+
+            if (!element.hasData || !dartCode) return;
+
+            if (!dartCode.hasInstancesMember) {
+                actions.push(dartCode.insertAllCommand());
+            }
+
+            if (dartCode.hasInstancesMember) {
+                actions.push(dartCode.updateChangesCommand());
+            }
+
+            if (!dartCode.hasEqualConstructor) {
+                actions.push(dartCode.constructorCodeAction());
+            }
+
+            if (!dartCode.hasEqualToStringMethod) {
+                actions.push(dartCode.toStringMethodCodeAction());
+            }
+
+            if (!dartCode.hasEqualFromMap) {
+                actions.push(dartCode.fromMapCodeAction());
+            }
+
+            if (!dartCode.hasEqualToMap) {
+                actions.push(dartCode.toMapCodeAction());
+            }
+
+            if (dartCode.hasEqualToMap && !dartCode.hasToJson) {
+                const action = dartCode.toJsonCodecCodeAction();
+
+                if (action) {
+                    actions.push(action);
+                }
+            }
+
+            if (dartCode.hasEqualFromMap && !dartCode.hasFromJson) {
+                const action = dartCode.fromJsonCodecCodeAction();
+
+                if (action) {
+                    actions.push(action);
+                }
+            }
+        }
 
         //vscode.commands.executeCommand(FORMAT_DOCUMENT);
 
+        return actions;
+    }
+
+    private insertFix(
+        document: vscode.TextDocument,
+        position: vscode.Position,
+        title: string,
+        text: string,
+    ): vscode.CodeAction {
+        const fix = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
+        fix.edit = new vscode.WorkspaceEdit();
+        fix.isPreferred = true;
+        fix.edit.insert(document.uri, position, text);
         return fix;
     }
 
-    private containsClassSyntax(document: vscode.TextDocument, range: vscode.Range): boolean {
-        const textLine = document.lineAt(range.start.line).text;
-        return regexp.classMatch.test(textLine);
-    }
-
-    private getText(document: vscode.TextDocument, range: vscode.Range): string {
-        const start = document.lineAt(range.start).range.start;
-        const end = document.lineAt(document.lineCount - 1).range.end;
-        const textRange = new vscode.Range(start, end);
-        return document.getText(textRange);
+    private replaceFix(
+        document: vscode.TextDocument,
+        range: vscode.Range,
+        title: string,
+        text: string,
+    ): vscode.CodeAction {
+        const fix = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
+        fix.edit = new vscode.WorkspaceEdit();
+        fix.isPreferred = true;
+        fix.edit.replace(document.uri, range, text);
+        return fix;
     }
 }

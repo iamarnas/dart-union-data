@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import getWorkspaceRoot from './workspace';
 
 class FileManager {
@@ -8,16 +9,19 @@ class FileManager {
         this.workspaceRoot = getWorkspaceRoot();
     }
 
-    get isWorkspaceOpen(): boolean {
-        return this.workspaceRoot !== undefined;
-    }
-
     existsSync(path: string): boolean {
         return fs.existsSync(path);
     }
 
     readFile(path: string): string {
         return fs.readFileSync(path, 'utf-8');
+    }
+
+    readFileFromWorkspace(...paths: string[]) {
+        if (!this.workspaceRoot) return;
+        const filePath = path.join(this.workspaceRoot, ...paths);
+        if (!this.existsSync(filePath)) return;
+        return this.readFile(filePath);
     }
 }
 

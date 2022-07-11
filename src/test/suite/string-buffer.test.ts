@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { beforeEach } from 'mocha';
-import StringBuffer from '../../utils/string-buffer';
+import { StringBuffer } from '../../utils/string-buffer';
 
 suite('StringBufer Test Suite', () => {
     const sb = new StringBuffer();
@@ -53,7 +53,7 @@ suite('StringBufer Test Suite', () => {
         assert.strictEqual(sb.toString(), '\n\t\ta, \n\t\t1, \n\t\ttrue, ');
     });
 
-    test('Should convert all types to string', () => {
+    test('Should write all types as string', () => {
         sb.write(100);
         assert.strictEqual(sb.toString(), '100', 'Should convert number to string');
         sb.clean();
@@ -72,5 +72,4 @@ suite('StringBufer Test Suite', () => {
         sb.clean();
         assert.strictEqual(sb.isEmpty, true);
     });
-
 });

@@ -1,33 +1,31 @@
-import { FieldElement } from '../interface/element';
-import { ClassData } from '../models/class.data';
-import { ConstructorData } from '../models/constructor.data';
-import { } from '../utils/string-apis';
-import StringBuffer from '../utils/string-buffer';
+import { FieldElement } from '../interface';
+import { ClassDataTemplate, ConstructorTemplate } from '../templates';
+import { buildString, StringBuffer } from '../utils/string-buffer';
+
+type MethodType = 'when' | 'maybeWhen' | 'whenOrNull' | 'map' | 'maybeMap' | 'mapOrNull';
 
 export class MethodGenerator {
     private readonly fields: FieldElement[];
-    private readonly factories: ConstructorData[];
+    private readonly factories: ConstructorTemplate[];
     private readonly name: string;
     private readonly superclass: string;
     private sb: StringBuffer = new StringBuffer();
     private methodType: MethodType = 'when';
 
-    constructor(private readonly element: ClassData) {
+    constructor(private readonly element: ClassDataTemplate) {
         this.factories = element.factories;
         this.fields = element.fields;
         this.name = element.name;
         this.superclass = element.name.decapitalize();
     }
 
-    static fromElement(element: ClassData): MethodGenerator {
+    static fromElement(element: ClassDataTemplate): MethodGenerator {
         return new MethodGenerator(element);
     }
 
     generate(methodType: MethodType): string {
         this.initialize(methodType);
-        this.methodName();
-        this.methodConstructor();
-        this.methodBlock();
+        this.writeMethod();
         return this.sb.toString();
     }
 
@@ -36,211 +34,200 @@ export class MethodGenerator {
         this.methodType = methodType;
     }
 
-    get whenEnumFunctions(): string[] {
-        return this.fields.map((e) => `required R Function() ${e.name}`);
-    }
-
-    get whenFunctions(): string[] {
-        return this.factories.map((e) => `required R Function(${e.callbackParams}) ${e.name}`);
-    }
-
-    get maybeWhenEnumFunctions(): string[] {
-        return this.fields.map((e) => `R Function()? ${e.name}`);
-    }
-
-    get maybeWhenFunctions(): string[] {
-        return this.factories.map((e) => `R Function(${e.callbackParams})? ${e.name}`);
-    }
-
-    get mapEnumFunctions(): string[] {
-        return this.fields.map((e) => `required R Function(${this.name} ${e.name}) ${e.name}`);
-    }
-
-    get mapFunctions(): string[] {
-        return this.factories.map((e) => `required R Function(${e.displayType} ${e.name}) ${e.name}`);
-    }
-
-    get maybeMapEnumFunctions(): string[] {
-        return this.fields.map((e) => `R Function(${this.name} ${e.name})? ${e.name}`);
-    }
-
-    get maybeMapFunctions(): string[] {
-        return this.factories.map((e) => `R Function(${e.displayType} ${e.name})? ${e.name}`);
-    }
-
-    private methodName() {
+    private writeMethod() {
         switch (this.methodType) {
             case 'when':
-                this.sb.writeln('R when<R>', 1);
-                break;
-            case 'maybeWhen':
-                this.sb.writeln('R maybeWhen<R>', 1);
-                break;
-            case 'whenOrNull':
-                this.sb.writeln('R? whenOrNull<R>', 1);
-                break;
-            case 'map':
-                this.sb.writeln('R map<R>', 1);
-                break;
-            case 'maybeMap':
-                this.sb.writeln('R maybeMap<R>', 1);
-                break;
-            case 'mapOrNull':
-                this.sb.writeln('R? mapOrNull<R>', 1);
-                break;
-        }
-    }
-
-    private methodConstructor() {
-        switch (this.methodType) {
-            case 'when':
-                this.whenConstructor();
-                break;
-            case 'maybeWhen':
-                this.maybeWhenConstructor();
-                break;
-            case 'whenOrNull':
-                this.whenOrNullConstructor();
-                break;
-            case 'map':
-                this.mapConstructor();
-                break;
-            case 'maybeMap':
-                this.maybeMapConstructor();
-                break;
-            case 'mapOrNull':
-                this.mapOrNullConstructor();
-                break;
-        }
-    }
-
-    private methodBlock() {
-        switch (this.methodType) {
-            case 'when':
+                this.whenFunc();
                 this.whenBlock();
                 break;
             case 'maybeWhen':
+                this.maybeWhenFunc();
                 this.maybeWhenBlock();
                 break;
             case 'whenOrNull':
+                this.whenOrNullFunc();
                 this.whenOrNullBlock();
                 break;
             case 'map':
+                this.mapFunc();
                 this.mapBlock();
                 break;
             case 'maybeMap':
+                this.maybeMapFunc();
                 this.maybeMapBlock();
                 break;
             case 'mapOrNull':
+                this.mapOrNullFunc();
                 this.mapOrNullBlock();
                 break;
         }
     }
 
-    private mapOrNullConstructor() {
-        this.sb.write('({');
-
+    /**
+     * @requires {@link mapOrNullBlock} to get full function.
+     */
+    private mapOrNullFunc() {
         if (this.element.isEnum) {
-            this.sb.writeBlock(this.maybeMapEnumFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? mapOrNull<R>',
+                    fields: this.fields,
+                    parameter: (field) => `R Function(${this.name} ${field.name})? ${field.name},`
+                }),
+            );
         } else {
-            this.sb.writeBlock(this.maybeMapFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? mapOrNull<R>',
+                    fields: this.factories,
+                    parameter: (field) => `R Function(${field.typeInference} ${field.name})? ${field.name},`,
+                }),
+            );
         }
-
-        this.sb.writeln('})', 1);
     }
 
-    private maybeMapConstructor() {
-        this.sb.write('({');
-
+    /**
+     * @requires {@link maybeMapBlock} to get full function.
+     */
+    private maybeMapFunc() {
         if (this.element.isEnum) {
-            this.sb.writeBlock(this.maybeMapEnumFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? maybeMap<R>',
+                    fields: this.fields,
+                    parameter: (field) => `R Function(${this.name} ${field.name})? ${field.name},`,
+                    default: 'required R Function() orElse,'
+                }),
+            );
         } else {
-            this.sb.writeBlock(this.maybeMapFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? maybeMap<R>',
+                    fields: this.factories,
+                    parameter: (field) => `R Function(${field.typeInference} ${field.name})? ${field.name},`,
+                    default: 'required R Function() orElse,'
+                }),
+            );
         }
-
-        this.sb.writeln('required R Function() orElse,', 2);
-        this.sb.writeln('})', 1);
     }
 
-    private mapConstructor() {
-        this.sb.write('({');
-
+    /**
+     * @requires {@link mapBlock} to get full function.
+     */
+    private mapFunc() {
         if (this.element.isEnum) {
-            this.sb.writeBlock(this.mapEnumFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R map<R>',
+                    fields: this.fields,
+                    parameter: (field) => `required R Function(${this.name} ${field.name}) ${field.name},`,
+                }),
+            );
         } else {
-            this.sb.writeBlock(this.mapFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? map<R>',
+                    fields: this.factories,
+                    parameter: (field) => `required R Function(${field.typeInference} ${field.name}) ${field.name},`,
+                }),
+            );
         }
-
-        this.sb.writeln('})', 1);
     }
 
-    private whenOrNullConstructor() {
-        this.sb.write('({');
-
+    /**
+     * @requires {@link whenOrNullBlock} to get full function.
+     */
+    private whenOrNullFunc() {
         if (this.element.isEnum) {
-            this.sb.writeBlock(this.maybeWhenEnumFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? whenOrNull<R>',
+                    fields: this.fields,
+                    parameter: (field) => `R Function()? ${field.name},`,
+                }),
+            );
         } else {
-            this.sb.writeBlock(this.maybeWhenFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? whenOrNull<R>',
+                    fields: this.factories,
+                    parameter: (field) => `R Function(${field.funcParameters})? ${field.name},`,
+                }),
+            );
         }
-
-        this.sb.writeln('})', 1);
     }
 
-    private maybeWhenConstructor() {
-        this.sb.write('({');
-
+    /**
+     * @requires {@link maybeWhenBlock} to get full function.
+     */
+    private maybeWhenFunc() {
         if (this.element.isEnum) {
-            this.sb.writeBlock(this.maybeWhenEnumFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? maybeWhen<R>',
+                    fields: this.fields,
+                    parameter: (field) => `R Function()? ${field.name},`,
+                    default: 'required R Function() orElse,',
+                }),
+            );
         } else {
-            this.sb.writeBlock(this.maybeWhenFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R? maybeWhen<R>',
+                    fields: this.factories,
+                    parameter: (field) => `R Function(${field.funcParameters})? ${field.name},`,
+                    default: 'required R Function() orElse,',
+                }),
+            );
         }
-
-        this.sb.writeln('required R Function() orElse,', 2);
-        this.sb.writeln('})', 1);
     }
 
-    private whenConstructor() {
-        this.sb.write('({');
-
+    /**
+     * @requires {@link whenBlock} to get full function.
+     */
+    private whenFunc() {
         if (this.element.isEnum) {
-            this.sb.writeBlock(this.whenEnumFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R when<R>',
+                    fields: this.fields,
+                    parameter: (field) => `required R Function() ${field.name},`,
+                }),
+            );
         } else {
-            this.sb.writeBlock(this.whenFunctions, ',', 2);
+            this.sb.write(
+                func({
+                    name: 'R when<R>',
+                    fields: this.factories,
+                    parameter: (field) => `required R Function(${field.funcParameters}) ${field.name},`,
+                }),
+            );
         }
-
-        this.sb.writeln('})', 1);
     }
 
     private whenBlock() {
         this.sb.write(' {');
 
         if (this.element.isEnum) {
-            this.sb.writeln('switch (this) {', 2);
-
-            for (const field of this.fields) {
-                this.sb.writeln(`case ${this.name}.${field.name}:`, 3);
-                this.sb.writeln(`return ${field.name}();`, 4);
-            }
-
-            this.sb.writeln('}', 2);
+            this.sb.write(
+                statement({
+                    fields: this.fields,
+                    statement: 'switch',
+                    parameter: (field) => `${this.name}.${field.name}:`,
+                    callback: (field) => `return ${field.name}();`,
+                }),
+            );
         } else {
             this.sb.writeln(`final ${this.superclass} = this;`, 2);
-
-            for (let i = 0; i < this.factories.length; i++) {
-                const value = this.factories[i];
-
-                if (i === 0) {
-                    this.sb.writeln(`if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}(${value.callbackParamsFrom(this.superclass)});`, 3);
-                } else {
-                    this.sb.writeln(`} else if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}(${value.callbackParamsFrom(this.superclass)});`, 3);
-                }
-            }
-
-            this.sb.writeln('} else {', 2);
-            this.sb.writeln('throw AssertionError();', 3);
-            this.sb.writeln('}', 2);
+            this.sb.write(
+                statement({
+                    fields: this.factories,
+                    statement: 'if',
+                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    callback: (field) => `return ${field.name}(${field.parametersFrom(this.superclass)});`,
+                    default: 'throw AssertionError();',
+                }),
+            );
         }
 
         this.sb.writeln('}', 1);
@@ -250,39 +237,28 @@ export class MethodGenerator {
         this.sb.write(' {');
 
         if (this.element.isEnum) {
-
-            for (let i = 0; i < this.fields.length; i++) {
-                const value = this.fields[i];
-
-                if (i === 0) {
-                    this.sb.writeln(`if (this == ${this.name}.${value.name} && ${value.name} != null) {`, 2);
-                    this.sb.writeln(`return ${value.name}();`, 3);
-                } else {
-                    this.sb.writeln(`} else if (this == ${this.name}.${value.name} && ${value.name} != null) {`, 2);
-                    this.sb.writeln(`return ${value.name}();`, 3);
-                }
-            }
-            this.sb.writeln('} else {', 2);
-            this.sb.writeln('return orElse();', 3);
-            this.sb.writeln('}', 2);
+            this.sb.write(
+                statement({
+                    fields: this.fields,
+                    statement: 'if',
+                    parameter: (field) => `this == ${this.name}.${field.name} && ${field.name} != null`,
+                    callback: (field) => `return ${field.name}();`,
+                    default: 'return orElse();',
+                }),
+            );
         } else {
             this.sb.writeln(`final ${this.superclass} = this;`, 2);
-
-            for (let i = 0; i < this.factories.length; i++) {
-                const value = this.factories[i];
-
-                if (i === 0) {
-                    this.sb.writeln(`if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}?.call(${value.callbackParamsFrom(this.superclass)}) ?? orElse();`, 3);
-                } else {
-                    this.sb.writeln(`} else if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}?.call(${value.callbackParamsFrom(this.superclass)}) ?? orElse();`, 3);
-                }
-            }
-            this.sb.writeln('} else {', 2);
-            this.sb.writeln('throw AssertionError();', 3);
-            this.sb.writeln('}', 2);
+            this.sb.write(
+                statement({
+                    fields: this.factories,
+                    statement: 'if',
+                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    callback: (field) => `return ${field.name}?.call(${field.parametersFrom(this.superclass)}) ?? orElse();`,
+                    default: 'throw AssertionError();',
+                }),
+            );
         }
+
         this.sb.writeln('}', 1);
     }
 
@@ -290,31 +266,25 @@ export class MethodGenerator {
         this.sb.write(' {');
 
         if (this.element.isEnum) {
-            this.sb.writeln('switch (this) {', 2);
-
-            for (const field of this.fields) {
-                this.sb.writeln(`case ${this.name}.${field.name}:`, 3);
-                this.sb.writeln(`return ${field.name}?.call();`, 4);
-            }
-
-            this.sb.writeln('}', 2);
+            this.sb.write(
+                statement({
+                    fields: this.fields,
+                    statement: 'switch',
+                    parameter: (field) => `${this.name}.${field.name}:`,
+                    callback: (field) => `return ${field.name}?.call();`,
+                }),
+            );
         } else {
             this.sb.writeln(`final ${this.superclass} = this;`, 2);
-
-            for (let i = 0; i < this.factories.length; i++) {
-                const value = this.factories[i];
-
-                if (i === 0) {
-                    this.sb.writeln(`if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}?.call(${value.callbackParamsFrom(this.superclass)});`, 3);
-                } else {
-                    this.sb.writeln(`} else if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}?.call(${value.callbackParamsFrom(this.superclass)});`, 3);
-                }
-            }
-            this.sb.writeln('} else {', 2);
-            this.sb.writeln('throw AssertionError();', 3);
-            this.sb.writeln('}', 2);
+            this.sb.write(
+                statement({
+                    fields: this.factories,
+                    statement: 'if',
+                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    callback: (field) => `return ${field.name}?.call(${field.parametersFrom(this.superclass)});`,
+                    default: 'throw AssertionError();',
+                }),
+            );
         }
 
         this.sb.writeln('}', 1);
@@ -324,32 +294,27 @@ export class MethodGenerator {
         this.sb.write(' {');
 
         if (this.element.isEnum) {
-            this.sb.writeln('switch (this) {', 2);
-
-            for (const field of this.fields) {
-                this.sb.writeln(`case ${this.name}.${field.name}:`, 3);
-                this.sb.writeln(`return ${field.name}(this);`, 4);
-            }
+            this.sb.write(
+                statement({
+                    fields: this.fields,
+                    statement: 'switch',
+                    parameter: (field) => `${this.name}.${field.name}:`,
+                    callback: (field) => `return ${field.name}(this);`,
+                }),
+            );
         } else {
             this.sb.writeln(`final ${this.superclass} = this;`, 2);
-
-            for (let i = 0; i < this.factories.length; i++) {
-                const value = this.factories[i];
-
-                if (i === 0) {
-                    this.sb.writeln(`if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}(${this.superclass});`, 3);
-                } else {
-                    this.sb.writeln(`} else if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}(${this.superclass});`, 3);
-                }
-            }
-
-            this.sb.writeln('} else {', 2);
-            this.sb.writeln('throw AssertionError();', 3);
+            this.sb.write(
+                statement({
+                    fields: this.factories,
+                    statement: 'if',
+                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    callback: (field) => `return ${field.name}(${this.superclass});`,
+                    default: 'throw AssertionError();',
+                }),
+            );
         }
 
-        this.sb.writeln('}', 2);
         this.sb.writeln('}', 1);
     }
 
@@ -357,40 +322,28 @@ export class MethodGenerator {
         this.sb.write(' {');
 
         if (this.element.isEnum) {
-            for (let i = 0; i < this.fields.length; i++) {
-                const value = this.fields[i];
-
-                if (i === 0) {
-                    this.sb.writeln(`if (this == ${this.name}.${value.name} && ${value.name} != null) {`, 2);
-                    this.sb.writeln(`return ${value.name}(this);`, 3);
-                } else {
-                    this.sb.writeln(`} else if (this == ${this.name}.${value.name} && ${value.name} != null) {`, 2);
-                    this.sb.writeln(`return ${value.name}(this);`, 3);
-                }
-            }
-
-            this.sb.writeln('} else {', 2);
-            this.sb.writeln('return orElse();', 3);
+            this.sb.write(
+                statement({
+                    fields: this.fields,
+                    statement: 'if',
+                    parameter: (field) => `this == ${this.name}.${field.name} && ${field.name} != null`,
+                    callback: (field) => `return ${field.name}(this);`,
+                    default: 'return orElse();',
+                }),
+            );
         } else {
             this.sb.writeln(`final ${this.superclass} = this;`, 2);
-
-            for (let i = 0; i < this.factories.length; i++) {
-                const value = this.factories[i];
-
-                if (i === 0) {
-                    this.sb.writeln(`if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}?.call(${this.superclass}) ?? orElse();`, 3);
-                } else {
-                    this.sb.writeln(`} else if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}?.call(${this.superclass}) ?? orElse();`, 3);
-                }
-            }
-
-            this.sb.writeln('} else {', 2);
-            this.sb.writeln('throw AssertionError();', 3);
+            this.sb.write(
+                statement({
+                    fields: this.factories,
+                    statement: 'if',
+                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    callback: (field) => `return ${field.name}?.call(${this.superclass}) ?? orElse();`,
+                    default: 'throw AssertionError();',
+                }),
+            );
         }
 
-        this.sb.writeln('}', 2);
         this.sb.writeln('}', 1);
     }
 
@@ -398,34 +351,110 @@ export class MethodGenerator {
         this.sb.write(' {');
 
         if (this.element.isEnum) {
-            this.sb.writeln('switch (this) {', 2);
-
-            for (const field of this.fields) {
-                this.sb.writeln(`case ${this.name}.${field.name}:`, 3);
-                this.sb.writeln(`return ${field.name}?.call(this);`, 4);
-            }
+            this.sb.write(
+                statement({
+                    fields: this.fields,
+                    statement: 'switch',
+                    parameter: (field) => `${this.name}.${field.name}:`,
+                    callback: (field) => `return ${field.name}?.call(this);`,
+                }),
+            );
         } else {
             this.sb.writeln(`final ${this.superclass} = this;`, 2);
-
-            for (let i = 0; i < this.factories.length; i++) {
-                const value = this.factories[i];
-
-                if (i === 0) {
-                    this.sb.writeln(`if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}?.call(${this.superclass});`, 3);
-                } else {
-                    this.sb.writeln(`} else if (${this.superclass} is ${value.displayType}) {`, 2);
-                    this.sb.writeln(`return ${value.name}?.call(${this.superclass});`, 3);
-                }
-            }
-
-            this.sb.writeln('} else {', 2);
-            this.sb.writeln('throw AssertionError();', 3);
+            this.sb.write(
+                statement({
+                    fields: this.factories,
+                    statement: 'if',
+                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    callback: (field) => `return ${field.name}?.call(${this.superclass});`,
+                    default: 'throw AssertionError();',
+                }),
+            );
         }
 
-        this.sb.writeln('}', 2);
         this.sb.writeln('}', 1);
     }
 }
 
-type MethodType = 'when' | 'maybeWhen' | 'whenOrNull' | 'map' | 'maybeMap' | 'mapOrNull';
+/**
+ * Returns the statement according to the specified values.
+ * @param options for setup statement output expression.
+ * @returns a string.
+ * @example 'switch(this) {...} or if(...) {}'
+ */
+function statement<T>(options: {
+    fields: T[],
+    statement: 'if' | 'switch',
+    parameter: (field: T) => string,
+    callback: (field: T) => string,
+    default?: string,
+}): string {
+    return buildString((sb) => {
+        switch (options.statement) {
+            case 'switch':
+                sb.writeln('switch (this) {', 2);
+
+                for (const field of options.fields) {
+                    sb.writeln(`case ${options.parameter(field)}`, 3);
+                    sb.writeln(`${options.callback(field)}`, 4);
+                }
+
+                if (options.default) {
+                    sb.writeln('default:', 3);
+                    sb.writeln(`${options.default}`, 4);
+                }
+
+                sb.writeln('}', 2);
+
+                return sb.toString();
+            case 'if':
+                for (let i = 0; i < options.fields.length; i++) {
+                    const field = options.fields[i];
+
+                    if (i === 0) {
+                        sb.writeln(`if (${options.parameter(field)}) {`, 2);
+                        sb.writeln(`${options.callback(field)}`, 3);
+                    } else {
+                        sb.writeln(`} else if (${options.parameter(field)}) {`, 2);
+                        sb.writeln(`${options.callback(field)}`, 3);
+                    }
+                }
+
+                sb.writeln('}', 2);
+
+                if (options.default) {
+                    sb.write(' else {');
+                    sb.writeln(`${options.default}`, 3);
+                    sb.writeln('}', 2);
+                }
+        }
+    });
+}
+
+/**
+ * Returns function with named optional parameters without block.
+ * @param options for setup function output expression.
+ * @returns a string.
+ * @example 'name({...})'
+ */
+function func<T>(options: {
+    name: string,
+    fields: T[],
+    parameter: (field: T) => string,
+    default?: string
+}): string {
+    return buildString((sb) => {
+        sb.write(options.name, 1);
+        sb.write('({');
+
+        for (const field of options.fields) {
+            sb.writeln(options.parameter(field), 2);
+        }
+
+        if (options.default) {
+            sb.writeln(options.default, 2);
+        }
+
+        sb.writeln('})', 1);
+    });
+}

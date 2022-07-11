@@ -10,6 +10,7 @@
     ],
     "rules": {
         "@typescript-eslint/consistent-type-assertions": "error",
+        "@typescript-eslint/no-non-null-assertion": "warn",
         "@typescript-eslint/naming-convention": "warn",
         "@typescript-eslint/semi": "warn",
         "@typescript-eslint/array-type": [
@@ -25,8 +26,10 @@
         ],
         "eqeqeq": "warn",
         "no-throw-literal": "warn",
+        "no-var": "error",
         "semi": "off",
         "wrap-regex": "error",
+        "no-useless-escape": "error",
         "prefer-const": [
             "error",
             {
@@ -35,7 +38,7 @@
             }
         ],
         "quotes": [
-            "error",
+            "warn",
             "single",
             {
                 "avoidEscape": true

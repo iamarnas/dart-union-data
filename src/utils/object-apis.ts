@@ -27,4 +27,3 @@ function isObject(object: any) {
 }
 
 export { deepEqual };
-

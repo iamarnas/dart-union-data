@@ -16,6 +16,7 @@ export async function run(): Promise<void> {
 	});
 
 	await nyc.createTempDirectory();
+	//await nyc.reset();
 	await nyc.wrap();
 
 	// Create the mocha test

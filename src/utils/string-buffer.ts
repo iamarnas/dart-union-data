@@ -37,7 +37,7 @@ interface StringSink {
  * Allows for the incremental building of a string using `write*()` methods.
  * The strings are concatenated to a single string only when `toString` is called.
  */
-export default class StringBuffer implements StringSink {
+export class StringBuffer implements StringSink {
     constructor(private content = '') { }
 
     /**
@@ -109,6 +109,17 @@ export default class StringBuffer implements StringSink {
      * @returns string of tabs.
      */
     private addTabs(tabs = 0): string {
-        return [...Array(tabs)].map(() => '\t').join('');
+        return Array.from(Array(tabs)).map(() => '\t').join('');
     }
+}
+
+/**
+ * The convenience function to build a string with {@link StringBuffer}
+ * @param builder a build actions.
+ * @returns a string
+ */
+export function buildString(builder: (sb: StringBuffer) => void): string {
+    const buffer = new StringBuffer();
+    builder(buffer);
+    return buffer.toString();
 }

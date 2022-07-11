@@ -1,22 +1,31 @@
-import Argument from '../models/argument';
-import { getGenericType, getWithoutGenericType } from '../models/class.data';
-import { ConstructorData } from '../models/constructor.data';
+import { ToStringMethodGenerator } from '.';
+import { ParameterExpression } from '../codecs/parameter-codec';
+import { Settings } from '../models/settings';
+import { isDebugMode } from '../shared/constants';
 import pubspec from '../shared/pubspec';
-import StringBuffer from '../utils/string-buffer';
+import { ConstructorTemplate, GenericTypeTemplate, ParametersTemplate } from '../templates';
+import { StringBuffer } from '../utils/string-buffer';
+import { ConstructorGenerator } from './constructor.generator';
 
-export default class SubclassGenerator {
+export class SubclassGenerator {
     private readonly subclass: string;
-    private readonly superClass: string;
-    private readonly superClassGeneric: string;
+    private readonly generic: GenericTypeTemplate;
+    private readonly parameters: ParametersTemplate;
+    private readonly settings: Settings;
     private sb: StringBuffer = new StringBuffer();
 
     constructor(
-        private readonly element: ConstructorData,
-        private readonly className: string,
+        private readonly element: ConstructorTemplate,
+        readonly className: string,
     ) {
-        this.subclass = element.subclass;
-        this.superClass = getWithoutGenericType(className);
-        this.superClassGeneric = getGenericType(className);
+        this.subclass = element.subclassName;
+        this.generic = element.superclass.generic;
+        this.parameters = this.element.parameters;
+        this.settings = this.element.superclass.settings;
+
+        if (isDebugMode()) {
+            console.log('Generated parameters for: ' + this.subclass, this.parameters.all);
+        }
     }
 
     generate(): string {
@@ -24,46 +33,68 @@ export default class SubclassGenerator {
         this.writeConstructor();
         this.sb.writeln();
         this.writeVariables();
-        this.sb.writeln();
-        this.writeCopyWithMethod();
+        if (this.parameters.isNotEmpty) {
+            this.sb.writeln();
+            this.writeCopyWithMethod();
+        }
         this.sb.writeln();
         this.writeToString();
         this.sb.writeln();
-        this.writeEqualityOperator();
-        this.sb.writeln();
-        this.writeHashCodeGetter();
+
+        if (this.settings.equatable) {
+            this.writeEquatableProps();
+        } else {
+            this.writeEqualityOperator();
+            this.sb.writeln();
+            this.writeHashCodeGetter();
+        }
+
         this.writeClassEnd();
         return this.sb.toString();
     }
 
-    private get params(): Argument[] {
-        return this.element.arguments;
+    /**
+     * @example name == other.name
+     */
+    private get equals(): string[] {
+        return this.parameters.expressionsOf('equal-to-other');
     }
 
-    private get operatorValues(): string[] {
-        return this.params.map((e) => `${e.name} == other.${e.name}`);
+    /**
+     * @example value
+     */
+    private get names(): string[] {
+        return this.parameters.expressionsOf('name');
     }
 
-    private get objects(): string[] {
-        return this.params.map((e) => `${e.name}`);
-    }
-
+    /**
+     * @example name.hashCode
+     */
     private get hashCodes(): string[] {
-        return this.params.map((e) => `${e.name}.hashCode`);
+        return this.parameters.expressionsOf('hashCode');
     }
 
-    private get varialbles(): string[] {
-        return this.params.map((e) => e.typeAndName);
-    }
+    /**
+     * Instance variables dependent on expression.
+     * @example final String name
+     */
+    private varialbles(expression: ParameterExpression): string[] {
+        return this.parameters.all.filter((e) => !e.isSuper).map((e) => {
+            if (e.isGetter) {
+                return '@override\n\t' + e.expression(expression);
+            }
 
-    private get finalVarialbles(): string[] {
-        return this.params.map((e) => e.finalVariable);
+            return e.expression(expression);
+        });
     }
 
     private writeClassTop() {
-        const subclass = `${this.subclass}${this.superClassGeneric}`;
-        const superClass = `${this.superClass}${this.element.genericType}`;
-        this.sb.write(`class ${subclass} extends ${superClass} {`);
+        // TODO: fix implementation
+        const ex = 'extends'; //this.element.superclass.isImmutableData ? 'extends' : 'implements';
+        const subclass = `${this.subclass}${this.generic.displayType}`;
+        const superClass = `${this.className}${this.generic.type}`;
+        const equatableMixin = !this.settings.equatable ? '' : 'with EquatableMixin ';
+        this.sb.write(`class ${subclass} ${ex} ${superClass} ${equatableMixin}{`);
     }
 
     private writeConstructor() {
@@ -71,29 +102,24 @@ export default class SubclassGenerator {
     }
 
     private writeVariables() {
-        if (!this.params.length) return;
-        this.sb.writeBlock(this.finalVarialbles, ';', 1);
+        if (this.parameters.isEmpty) return;
+        if (this.element.isConst) {
+            this.sb.writeBlock(this.varialbles('final-instance-variable'), ';', 1);
+        } else {
+            this.sb.writeBlock(this.varialbles('instance-variable'), ';', 1);
+        }
     }
 
     private writeToString() {
-        const expression = `String toString() => ${this.element.toStringValue}`;
-
-        if (expression.length < 78) {
-            this.sb.writeln('@override', 1);
-            this.sb.writeln(expression, 1);
-        } else {
-            // Block
-            this.sb.writeln('@override', 1);
-            this.sb.writeln('String toString() {', 1);
-            this.sb.writeln(`return ${this.element.toStringValue}`, 2);
-            this.sb.writeln('}', 1);
-        }
-
+        return new ToStringMethodGenerator(this.element)
+            .asOverridable()
+            .writeCode()
+            .generate();
     }
 
     private writeEqualityOperator() {
-        const values = !this.operatorValues.length ? ';' : ` && ${this.operatorValues.join(' && ')};`;
-        const expression = `return other is ${this.element.displayType}${values}`;
+        const values = !this.equals.length ? ';' : ` && ${this.equals.join(' && ')};`;
+        const expression = `return other is ${this.element.typeInference}${values}`;
 
         this.sb.writeln('@override', 1);
         this.sb.writeln('bool operator ==(Object other) {', 1);
@@ -103,8 +129,8 @@ export default class SubclassGenerator {
             this.sb.writeln(expression, 2);
         } else {
             // Block
-            this.sb.writeln(`return other is ${this.element.displayType} &&\n`, 2);
-            this.sb.writeAll(this.operatorValues, ' &&\n', 4);
+            this.sb.writeln(`return other is ${this.element.typeInference} &&\n`, 2);
+            this.sb.writeAll(this.equals, ' &&\n', 4);
             this.sb.write(';');
         }
 
@@ -114,13 +140,13 @@ export default class SubclassGenerator {
     // TODO: do not write if equatable enabled.
     private writeHashCodeGetter() {
         if (pubspec.sdkVersion >= 2.14) {
-            this.writeHashCodeObject();
+            this.writeHashCodeObjects();
         } else {
-            this.writeHashCode();
+            this.writeHashCodes();
         }
     }
 
-    private writeHashCode() {
+    private writeHashCodes() {
         const getter = 'int get hashCode => ';
         const hashCodes = !this.hashCodes.length ? '0;' : `${this.hashCodes.join(' ^ ')};`;
         const expression = `${getter}${hashCodes}`;
@@ -137,24 +163,45 @@ export default class SubclassGenerator {
         }
     }
 
-    private writeHashCodeObject() {
+    private writeHashCodeObjects() {
         const getter = 'int get hashCode => ';
-        const objects = !this.objects.length ? '0;' : `${this.objects.join(', ')}`;
+        const objects = !this.names.length ? '0;' : `${this.names.join(', ')}`;
         const expression = `${getter}Object.hash(${objects});`;
 
         this.sb.writeln('@override', 1);
         // Object.hash() requires at least two values.
-        if (this.objects.length > 1) {
+        if (this.names.length > 1) {
             if (expression.length < 78) {
                 this.sb.writeln(expression, 1);
             } else {
                 // Block
                 this.sb.writeln(`${getter}Object.hash(`, 1);
-                this.sb.writeBlock(this.objects, ',', 4);
+                this.sb.writeBlock(this.names, ',', 4);
                 this.sb.writeln(');', 2);
             }
         } else {
+            if (this.parameters.isEmpty) {
+                this.sb.writeln(`${getter}${objects}`, 1);
+                return;
+            }
+
             this.sb.writeln(`${getter}${objects}.hashCode;`, 1);
+        }
+    }
+
+    private writeEquatableProps() {
+        const getter = 'List<Object?> get props => ';
+        const props = this.parameters.expressionsOf('name');
+        const expression = `${getter}[${props.join(', ')}];`;
+
+        this.sb.writeln('@override', 1);
+
+        if (expression.length < 78) {
+            this.sb.writeln(expression, 1);
+        } else {
+            this.sb.writeln(`${getter}[`, 1);
+            this.sb.writeBlock(props, ',', 4);
+            this.sb.writeln('];', 3);
         }
     }
 
@@ -163,14 +210,18 @@ export default class SubclassGenerator {
     }
 
     private writeCopyWithMethod() {
-        const type = `${this.element.subclass}CopyWith${this.element.genericType}`;
-        this.sb.writeln(`${type} get copyWith => _${this.element.subclass}CopyWith(this);`, 1);
+        const type = `${this.subclass}CopyWith${this.generic.type}`;
+        this.sb.writeln(`${type} get copyWith => _${this.subclass}CopyWith(this);`, 1);
     }
 
-    // TODO: implement super constructor.
     private classConstructor(): string {
-        const line = `const ${this.subclass}(${this.element.initValues()}) : super._();`;
-        if (line.length < 78) return line;
-        return `const ${this.subclass}(${this.element.initValues(true)}) : super._();`;
+        const constr = new ConstructorGenerator(this.element, this.subclass);
+        const expressionBody = constr.writeConstructor().generate();
+
+        if (expressionBody.length < 78) {
+            return expressionBody;
+        }
+
+        return constr.asBlock().writeConstructor().generate();;
     }
 }
