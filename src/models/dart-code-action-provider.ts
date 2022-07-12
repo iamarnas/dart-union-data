@@ -98,36 +98,28 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
                 actions.push(dartCode.updateChangesCommand());
             }
 
-            if (dartCode.constructorRange() === undefined) {
-                actions.push(dartCode.constructorFix());
+            if (!dartCode.constructorCode.isGenerated) {
+                actions.push(dartCode.constructorCode.fix());
             }
 
-            if (dartCode.toStringMethodRange() === undefined) {
-                actions.push(dartCode.toStringMethodFix());
+            if (!dartCode.toString.isGenerated) {
+                actions.push(dartCode.toString.fix());
             }
 
-            if (dartCode.fromMapRange() === undefined) {
-                actions.push(dartCode.fromMapFix());
+            if (!dartCode.fromMap.isGenerated) {
+                actions.push(dartCode.fromMap.fix());
             }
 
-            if (dartCode.toMapRange() === undefined) {
-                actions.push(dartCode.toMapFix());
+            if (!dartCode.toMap.isGenerated) {
+                actions.push(dartCode.toMap.fix());
             }
 
-            if (dartCode.hasEqualToMap && !dartCode.hasToJson) {
-                const action = dartCode.toJsonCodecFix();
-
-                if (action) {
-                    actions.push(action);
-                }
+            if (dartCode.toMap.isGenerated && !dartCode.toJson.isGenerated) {
+                actions.push(dartCode.toJson.fix());
             }
 
-            if (dartCode.hasEqualFromMap && !dartCode.hasFromJson) {
-                const action = dartCode.fromJsonCodecFix();
-
-                if (action) {
-                    actions.push(action);
-                }
+            if (dartCode.fromMap.isGenerated && !dartCode.fromJson.isGenerated) {
+                actions.push(dartCode.fromJson.fix());
             }
         }
 

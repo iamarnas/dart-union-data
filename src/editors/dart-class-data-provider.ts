@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { DartCodeProvider, Insertion, Replacement } from '.';
+import { CodeValue, DartCodeProvider } from '.';
 import { DartCodeGenerator } from '../generators';
 import { ElementKind } from '../interface';
 import { ClassDataTemplate } from '../templates';
@@ -11,6 +11,12 @@ export const GENERATE_DATA = 'generate.class.data';
 
 export class DartClassDataProvider {
     readonly code: DartCodeGenerator;
+    readonly constructorCode: ConstructorCode;
+    readonly toString: ToStringCode;
+    readonly fromMap: FromMapCode;
+    readonly toMap: ToMapCode;
+    readonly fromJson: FromJsonCode;
+    readonly toJson: ToJsonCode;
 
     constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
         if (element.kind !== ElementKind.class) {
@@ -18,6 +24,28 @@ export class DartClassDataProvider {
         }
 
         this.code = new DartCodeGenerator(element);
+        this.constructorCode = new ConstructorCode(provider, element);
+        this.toString = new ToStringCode(provider, element);
+        this.fromMap = new FromMapCode(provider, element);
+        this.toMap = new ToMapCode(provider, element);
+        this.fromJson = new FromJsonCode(provider, element);
+        this.toJson = new ToJsonCode(provider, element);
+
+        if (this.fromMap.range !== undefined) {
+            this.fromJson = new FromJsonCode(
+                provider,
+                element,
+                new vscode.Position(this.fromMap.range.end.line + 1, 0),
+            );
+        }
+
+        if (this.toMap.range !== undefined) {
+            this.toJson = new ToJsonCode(
+                provider,
+                element,
+                new vscode.Position(this.toMap.range.end.line + 1, 0),
+            );
+        }
     }
 
     get hasConvertImport(): boolean {
@@ -34,187 +62,22 @@ export class DartClassDataProvider {
         return this.element.factories.length !== 0;
     }
 
-    get hasEqualConstructor(): boolean {
-        return identicalCode(
-            this.constructorBody(),
-            this.provider.getTextFromCode(this.constructorRange()),
-        );
-    }
-
-    get hasEqualToStringMethod(): boolean {
-        return identicalCode(
-            this.toStringMethod(),
-            this.provider.getTextFromCode(this.toStringMethodRange()),
-        );
-    }
-
-    get hasEqualFromMap(): boolean {
-        return identicalCode(
-            this.fromMap(),
-            this.provider.getTextFromCode(this.fromMapRange()),
-        );
-    }
-
-    get hasEqualToMap(): boolean {
-        return identicalCode(
-            this.toMap(),
-            this.provider.getTextFromCode(this.toMapRange()),
-        );
-    }
-
     get changes() {
         return [
-            { isGenerated: this.constructorRange() !== undefined, isEqual: this.hasEqualConstructor },
-            { isGenerated: this.toStringMethodRange() !== undefined, isEqual: this.hasEqualToStringMethod },
-            { isGenerated: this.fromMapRange() !== undefined, isEqual: this.hasEqualFromMap },
-            { isGenerated: this.toMapRange() !== undefined, isEqual: this.hasEqualFromMap },
+            this.constructorCode,
+            this.toString,
+            this.fromMap,
+            this.toMap,
         ];
     }
 
     get hasChanges(): boolean {
         const generated = this.changes.filter((e) => e.isGenerated);
-        return generated.some((e) => !e.isEqual);
+        return generated.some((e) => !e.isUpdated);
     }
 
     get hasNoDataCreated(): boolean {
         return this.changes.every((e) => !e.isGenerated);
-    }
-
-    get hasToJson(): boolean {
-        return this.provider.has(this.toJsonCodec());
-    }
-
-    get hasFromJson(): boolean {
-        return this.provider.has(this.fromJsonCodec());
-    }
-
-    constructorBody(): string {
-        return new DartCodeGenerator(this.element).writeConstructor().generate();
-    }
-
-    constructorRange(): vscode.Range | undefined {
-        return this.provider.whereCodeFirstLine((line) => {
-            return line.text.indexOf(`${this.element.name}(`) !== -1
-                && !line.text.includesOne('toString()', '=>', 'return');
-        }, this.provider.codeLines);
-    }
-
-    constructorFix(): vscode.CodeAction {
-        return this.provider.insertFix(
-            this.provider.start.range.end,
-            'Generate Contructor',
-            this.constructorReplacement(),
-        );
-    }
-
-    toStringMethod(): string {
-        return new DartCodeGenerator(this.element).writeToString().generate();
-    }
-
-    toStringMethodRange(): vscode.Range | undefined {
-        return this.provider.findCodeRange('String toString() ', this.provider.codeLines);
-    }
-
-    toStringMethodFix(): vscode.CodeAction {
-        return this.provider.insertFix(
-            this.provider.endPositionWithinCode(),
-            'Generate to String Method',
-            this.toStringMethodReplacement(),
-        );
-    }
-
-    fromMap(): string {
-        return new DartCodeGenerator(this.element).writeFromMap().generate();
-    }
-
-    fromMapRange(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.fromMap(), this.provider.codeLines);
-    }
-
-    fromMapFix(): vscode.CodeAction {
-        return this.provider.insertFix(
-            this.provider.endPositionWithinCode(),
-            'Generate fromMap Map',
-            this.fromMapReplacement(),
-        );
-    }
-
-    toMap(): string {
-        return new DartCodeGenerator(this.element).writeToMap().generate();
-    }
-
-    toMapRange(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.toMap(), this.provider.codeLines);
-    }
-
-    toMapFix(): vscode.CodeAction {
-        return this.provider.insertFix(
-            this.provider.endPositionWithinCode(),
-            'Generate toMap Map',
-            this.toMapReplacement(),
-        );
-    }
-
-    jsonCodecs(): string {
-        return new DartCodeGenerator(this.element).writeJsonCodecs().generate();
-    }
-
-    toJsonCodec(): string {
-        return new DartCodeGenerator(this.element).writeToJson().generate();
-    }
-
-    /**
-     * The code action for `toJson` method.
-     * @returns [vscode.CodeAction] or undefined if {@link toMap `toMap`} {@link toMapRange range} does not exist.
-     */
-    toJsonCodecFix(): vscode.CodeAction | undefined {
-        const range = this.toMapRange();
-
-        if (range) {
-            const position = new vscode.Position(range.end.line + 1, 0);
-            return this.provider.insertFix(position, 'Generate to JSON Codecs', this.toJsonReplacement());
-        }
-    }
-
-    fromJsonCodec(): string {
-        return new DartCodeGenerator(this.element).writeFromJson().generate();
-    }
-
-    /**
-     * The code action for `fromJson` method.
-     * @returns [vscode.CodeAction] or undefined if {@link fromMap `fromMap`} {@link fromMapRange range} does not exist.
-     */
-    fromJsonCodecFix(): vscode.CodeAction | undefined {
-        const range = this.fromMapRange();
-        if (!range) return;
-        const position = new vscode.Position(range.end.line + 1, 0);
-        return this.provider.insertFix(position, 'Generate From JSON Codecs', this.fromJsonReplacement());
-    }
-
-    // Replacements.
-    constructorReplacement(): string {
-        const space = this.provider.start.isEmptyOrWhitespace ? '' : '\n';
-        return '\n\t' + this.constructorBody() + space;
-    }
-
-    toStringMethodReplacement(): string {
-        return '\n\t@override\n' + this.toStringMethod() + '\n';
-    }
-
-    fromMapReplacement(): string {
-        return '\n' + this.fromMap() + '\n';
-    }
-
-    toMapReplacement(): string {
-        return '\n' + this.toMap() + '\n';
-    }
-
-    fromJsonReplacement(): string {
-        return '\n' + this.fromJsonCodec() + '\n';
-    }
-
-    toJsonReplacement(): string {
-        return '\n' + this.toJsonCodec() + '\n';
     }
 
     updateChangesCommand(): vscode.CodeAction {
@@ -234,49 +97,255 @@ export class DartClassDataProvider {
     }
 
     updateChanges() {
-        const replacements: Replacement[] = [];
-        const toStringRange = this.toStringMethodRange();
-        const constructorRange = this.constructorRange();
-        const fromMapRange = this.fromMapRange();
-        const toMapRange = this.toMapRange();
-
-        if (constructorRange && !this.hasEqualConstructor) {
-            replacements.push({ range: constructorRange, value: '\t' + this.constructorBody() });
-        }
-
-        if (toStringRange && !this.hasEqualToStringMethod) {
-            replacements.push({ range: toStringRange, value: this.toStringMethod() });
-        }
-
-        if (fromMapRange && !this.hasEqualFromMap) {
-            replacements.push({ range: fromMapRange, value: this.fromMap() });
-        }
-
-        if (toMapRange && !this.hasEqualToMap) {
-            replacements.push({ range: toMapRange, value: this.toMap() });
-        }
-
-        this.provider.replace(...replacements);
+        this.provider.replace(...this.changes);
     }
 
     generateData() {
-        const insertions: Insertion[] = [];
+        const insertions: CodeValue[] = [];
+
         if (!this.hasConvertImport) {
-            insertions.push({ position: new vscode.Position(0, 0), value: "import 'dart:convert';\n\n" });
+            insertions.push({
+                position: new vscode.Position(0, 0),
+                replacement: "import 'dart:convert';\n\n"
+            } as CodeValue);
         }
 
-        insertions.push(
-            { position: this.provider.start.range.end, value: this.constructorReplacement() },
-            {
-                position: this.provider.endPositionWithinCode(),
-                value: this.toStringMethodReplacement()
-                    + this.fromMapReplacement()
-                    + this.fromJsonReplacement()
-                    + this.toMapReplacement()
-                    + this.toJsonReplacement()
-            }
-        );
+        this.provider.insert(...insertions, ...this.changes);
+    }
+}
 
-        this.provider.insert(...insertions);
+class ConstructorCode implements CodeValue {
+    value: string;
+
+    constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
+        this.value = '\t' + new DartCodeGenerator(element).writeConstructor().generate()
+    }
+
+    get replacement(): string {
+        const space = this.provider.start.isEmptyOrWhitespace ? '' : '\n';
+        return '\n' + this.value + space;
+    }
+
+    get position(): vscode.Position {
+        return this.provider.start.range.end;
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get isUpdated(): boolean {
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
+    }
+
+    get range(): vscode.Range | undefined {
+        return this.provider.whereCodeFirstLine((line) => {
+            return line.text.indexOf(`${this.element.name}(`) !== -1
+                && !line.text.includesOne('toString()', '=>', 'return');
+        }, this.provider.codeLines);
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate Contructor',
+            this.replacement,
+        );
+    }
+}
+
+class ToStringCode implements CodeValue {
+    value: string;
+
+    constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
+        this.value = new DartCodeGenerator(element).writeToString().generate();
+    }
+
+    get replacement(): string {
+        return '\n\t@override\n' + this.value + '\n';
+    }
+
+    get position(): vscode.Position {
+        return this.provider.endPositionWithinCode();
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get isUpdated(): boolean {
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
+    }
+
+    get range(): vscode.Range | undefined {
+        return this.provider.findCodeRange('String toString() ', this.provider.codeLines);
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate to String Method',
+            this.replacement,
+        );
+    }
+}
+
+class FromMapCode implements CodeValue {
+    value: string;
+
+    constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
+        this.value = new DartCodeGenerator(this.element).writeFromMap().generate();
+    }
+
+    get replacement(): string {
+        return '\n' + this.value + '\n';
+    }
+
+    get position(): vscode.Position {
+        return this.provider.endPositionWithinCode();
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get isUpdated(): boolean {
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
+    }
+
+    get range(): vscode.Range | undefined {
+        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate fromMap Map',
+            this.replacement,
+        );
+    }
+}
+
+class ToMapCode implements CodeValue {
+    value: string;
+
+    constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
+        this.value = new DartCodeGenerator(this.element).writeToMap().generate();
+    }
+
+    get replacement(): string {
+        return '\n' + this.value + '\n';
+    }
+
+    get position(): vscode.Position {
+        return this.provider.endPositionWithinCode();
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get isUpdated(): boolean {
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
+    }
+
+    get range(): vscode.Range | undefined {
+        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate toMap Map',
+            this.replacement,
+        );
+    }
+}
+
+class FromJsonCode implements CodeValue {
+    value: string;
+    position: vscode.Position;
+
+    constructor(
+        private provider: DartCodeProvider,
+        element: ClassDataTemplate,
+        position?: vscode.Position,
+    ) {
+        this.value = new DartCodeGenerator(element).writeFromJson().generate();
+        this.position = position ?? provider.endPositionWithinCode();
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get range(): vscode.Range | undefined {
+        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+    }
+
+    get replacement(): string {
+        return '\n' + this.value + '\n';
+    }
+
+    get isUpdated(): boolean {
+        return this.provider.has(this.value);
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate from JSON Codecs',
+            this.replacement,
+        );
+    }
+}
+
+class ToJsonCode implements CodeValue {
+    value: string;
+    position: vscode.Position;
+
+    constructor(
+        private provider: DartCodeProvider,
+        element: ClassDataTemplate,
+        position?: vscode.Position,
+    ) {
+        this.value = new DartCodeGenerator(element).writeToJson().generate();
+        this.position = position ?? provider.endPositionWithinCode();
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get range(): vscode.Range | undefined {
+        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+    }
+
+    get replacement(): string {
+        return '\n' + this.value + '\n';
+    }
+
+    get isUpdated(): boolean {
+        return this.provider.has(this.value);
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate to JSON Codecs',
+            this.replacement,
+        );
     }
 }

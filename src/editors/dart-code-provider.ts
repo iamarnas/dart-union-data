@@ -134,25 +134,29 @@ export class DartCodeProvider extends CodeReader {
         return action;
     }
 
-    replace(...replacements: Replacement[]) {
+    replace(...replacements: CodeValue[]) {
         this.editor.edit((editBuilder) => {
-            replacements.forEach((element) => editBuilder.replace(element.range, element.value));
+            replacements.forEach((element) => {
+                if (element.range) {
+                    editBuilder.replace(element.range, element.value)
+                }
+            });
         });
     }
 
-    insert(...insertions: Insertion[]) {
+    insert(...insertions: CodeValue[]) {
         this.editor.edit((editBuilder) => {
-            insertions.forEach((element) => editBuilder.insert(element.position, element.value));
+            insertions.forEach((element) => editBuilder.insert(element.position, element.replacement));
         });
     }
 }
 
-export interface Replacement {
-    range: vscode.Range
+export interface CodeValue {
     value: string,
-};
-
-export interface Insertion {
+    replacement: string,
     position: vscode.Position,
-    value: string,
-};
+    isGenerated: boolean,
+    isUpdated: boolean,
+    range: vscode.Range | undefined;
+    fix(): vscode.CodeAction
+}
