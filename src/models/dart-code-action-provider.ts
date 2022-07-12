@@ -5,16 +5,13 @@ import { ElementKind } from '../interface';
 import '../types/array';
 import '../types/string';
 
-const FORMAT_DOCUMENT = 'editor.action.formatDocument';
-const FORMAT_CHANGES = 'editor.action.formatChanges';
-
 export class DartCodeActionProvider implements vscode.CodeActionProvider {
     code: DartCodeProvider;
 
     constructor(public editor: vscode.TextEditor) {
         this.code = new DartCodeProvider(editor);
 
-        vscode.window.onDidChangeTextEditorSelection((event) => {
+        vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
             this.code = new DartCodeProvider(event.textEditor);
         });
     }
@@ -93,32 +90,32 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
 
             if (!element.hasData || !dartCode) return;
 
-            if (!dartCode.hasInstancesMember) {
+            if (dartCode.hasNoDataCreated) {
                 actions.push(dartCode.insertAllCommand());
             }
 
-            if (dartCode.hasInstancesMember) {
+            if (dartCode.hasChanges) {
                 actions.push(dartCode.updateChangesCommand());
             }
 
-            if (!dartCode.hasEqualConstructor) {
-                actions.push(dartCode.constructorCodeAction());
+            if (dartCode.constructorRange() === undefined) {
+                actions.push(dartCode.constructorFix());
             }
 
-            if (!dartCode.hasEqualToStringMethod) {
-                actions.push(dartCode.toStringMethodCodeAction());
+            if (dartCode.toStringMethodRange() === undefined) {
+                actions.push(dartCode.toStringMethodFix());
             }
 
-            if (!dartCode.hasEqualFromMap) {
-                actions.push(dartCode.fromMapCodeAction());
+            if (dartCode.fromMapRange() === undefined) {
+                actions.push(dartCode.fromMapFix());
             }
 
-            if (!dartCode.hasEqualToMap) {
-                actions.push(dartCode.toMapCodeAction());
+            if (dartCode.toMapRange() === undefined) {
+                actions.push(dartCode.toMapFix());
             }
 
             if (dartCode.hasEqualToMap && !dartCode.hasToJson) {
-                const action = dartCode.toJsonCodecCodeAction();
+                const action = dartCode.toJsonCodecFix();
 
                 if (action) {
                     actions.push(action);
@@ -126,15 +123,13 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
             }
 
             if (dartCode.hasEqualFromMap && !dartCode.hasFromJson) {
-                const action = dartCode.fromJsonCodecCodeAction();
+                const action = dartCode.fromJsonCodecFix();
 
                 if (action) {
                     actions.push(action);
                 }
             }
         }
-
-        //vscode.commands.executeCommand(FORMAT_DOCUMENT);
 
         return actions;
     }

@@ -51,6 +51,13 @@ export class DartCodeProvider extends CodeReader {
         return this.detectCodeRange(this.selection.range.start, regexp.classMatch);
     }
 
+    /**
+     * The method is similar to `document.getText()`,
+     * but only searches in the text area of the selected code,
+     * the rest of the content will be ignored.
+     * @param range include only the text included in the range
+     * @returns the text inside the provided range or the entire text.
+     */
     getTextFromCode(range?: vscode.Range | undefined): string {
         const lines = this.codeLines.filter((l) => range && range.contains(l.range));
         return this.doc.getText(this.rangeFromTextLines(...lines));
@@ -90,13 +97,14 @@ export class DartCodeProvider extends CodeReader {
 
     /**
      * The position of the end of the selected code within the code.
+     * The expected position is before the last character `}`.
      * @returns end position inside the code.
      */
     endPositionWithinCode() {
         return new vscode.Position(this.end.line, this.end.character - 1);
     }
 
-    insert(
+    insertFix(
         position: vscode.Position,
         title: string,
         text: string,
@@ -108,7 +116,7 @@ export class DartCodeProvider extends CodeReader {
         return fix;
     }
 
-    replace(
+    replaceFix(
         range: vscode.Range,
         title: string,
         text: string,
@@ -120,22 +128,31 @@ export class DartCodeProvider extends CodeReader {
         return fix;
     }
 
-    createCommand(command: vscode.Command | undefined): vscode.CodeAction {
+    command(command: vscode.Command | undefined): vscode.CodeAction {
         const action = new vscode.CodeAction(command?.title ?? '', vscode.CodeActionKind.QuickFix);
         action.command = command;
         return action;
     }
 
-    replaceValue(range: vscode.Range, value: string) {
-        this.editor.edit((editBuilder) => editBuilder.replace(range, value));
+    replace(...replacements: Replacement[]) {
+        this.editor.edit((editBuilder) => {
+            replacements.forEach((element) => editBuilder.replace(element.range, element.value));
+        });
     }
 
-    insertValue(...insertions: InsertionValue[]) {
-        this.editor.edit((editBuilder) => insertions.forEach((element) => editBuilder.insert(element.position, element.value)));
+    insert(...insertions: Insertion[]) {
+        this.editor.edit((editBuilder) => {
+            insertions.forEach((element) => editBuilder.insert(element.position, element.value));
+        });
     }
 }
 
-export interface InsertionValue {
+export interface Replacement {
+    range: vscode.Range
+    value: string,
+};
+
+export interface Insertion {
     position: vscode.Position,
     value: string,
 };

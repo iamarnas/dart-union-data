@@ -5,8 +5,10 @@ import '../types/array';
 import '../types/string';
 import { deepEqual, regexp } from '../utils';
 
-type PartiallyRequired<T, K extends keyof T> = Pick<T, K> & Partial<Omit<T, K>>;
-type BufferParameter = PartiallyRequired<Parameter, 'name'>;
+/**
+ * A type that requires a parameter name to use for {@link ParametersTemplate.buffer buffer} key names.
+ */
+type BufferParameter = Pick<Parameter, 'name'> & Partial<Omit<Parameter, 'name'>>;
 
 export class ParametersTemplate {
     private buffer = new Map<string, Parameter>();

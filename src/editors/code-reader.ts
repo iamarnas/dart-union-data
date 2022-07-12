@@ -190,6 +190,7 @@ export abstract class CodeReader {
      * A function that reads code to the top from the current position
      * and if a predicate was found reads code to the end.
      * @param position current position.
+     * @param predicate is a match to detect the first line of the code. Code first line must contain closure brackets `{` or `(`.
      * @returns range of the code. If code was not detected undefined returns.
      */
     detectCodeRange(position: vscode.Position, predicate: RegExp | string): vscode.Range | undefined {
