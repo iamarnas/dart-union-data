@@ -33,7 +33,7 @@ export class EnumDataGenerator {
 
     /** Generates inside the enhanced enum class or inside extension. */
     writeMethods(): this {
-        this.sb.writeAll(this.methods(), '\n\n');
+        this.sb.writeAll(this.methods, '\n\n');
         return this;
     }
 
@@ -47,7 +47,7 @@ export class EnumDataGenerator {
         return this.sb.toString();
     }
 
-    methods() {
+    get methods() {
         const methodGenerator = MethodGenerator.fromElement(this.element);
         return [
             methodGenerator.generate('map'),

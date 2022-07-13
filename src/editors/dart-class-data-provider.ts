@@ -6,8 +6,8 @@ import { ClassDataTemplate } from '../templates';
 import '../types/string';
 import { identicalCode } from '../utils';
 
-export const UPDATE_DATA = 'update.class.data';
-export const GENERATE_DATA = 'generate.class.data';
+export const UPDATE_COMMAND = 'update.class.data';
+export const GENERATE_COMMAND = 'generate.class.data';
 
 export class DartClassDataProvider {
     readonly code: DartCodeGenerator;
@@ -31,6 +31,7 @@ export class DartClassDataProvider {
         this.fromJson = new FromJsonCode(provider, element);
         this.toJson = new ToJsonCode(provider, element);
 
+        // Update the position to insert `fromJson` below the `fromMap`.
         if (this.fromMap.range !== undefined) {
             this.fromJson = new FromJsonCode(
                 provider,
@@ -39,6 +40,7 @@ export class DartClassDataProvider {
             );
         }
 
+        // Update the position to insert `toJson` below the `toMap`.
         if (this.toMap.range !== undefined) {
             this.toJson = new ToJsonCode(
                 provider,
@@ -62,42 +64,51 @@ export class DartClassDataProvider {
         return this.element.factories.length !== 0;
     }
 
-    get changes() {
+    get values() {
         return [
             this.constructorCode,
             this.toString,
             this.fromMap,
             this.toMap,
+            this.fromJson
         ];
     }
 
     get hasChanges(): boolean {
-        const generated = this.changes.filter((e) => e.isGenerated);
+        const generated = this.values.filter((e) => e.isGenerated);
         return generated.some((e) => !e.isUpdated);
     }
 
     get hasNoDataCreated(): boolean {
-        return this.changes.every((e) => !e.isGenerated);
+        return this.values.every((e) => !e.isGenerated);
     }
 
-    updateChangesCommand(): vscode.CodeAction {
+    /**
+     * The `vscode.CodeAction` command to update all members of the class.
+     * @returns `vscode.CodeAction`.
+     */
+    updateCommand(): vscode.CodeAction {
         return this.provider.command({
-            command: UPDATE_DATA,
+            command: UPDATE_COMMAND,
             title: 'Update All Changes',
             tooltip: 'This will update all members of the class',
         });
     }
 
-    insertAllCommand(): vscode.CodeAction {
+    /**
+     * The `vscode.CodeAction` command to generate all members of the class.
+     * @returns `vscode.CodeAction`.
+     */
+    generateCommand(): vscode.CodeAction {
         return this.provider.command({
-            command: GENERATE_DATA,
+            command: GENERATE_COMMAND,
             title: 'Generate Class Data',
             tooltip: 'This will generate all members of the class',
         });
     }
 
     updateChanges() {
-        this.provider.replace(...this.changes);
+        this.provider.replace(...this.values);
     }
 
     generateData() {
@@ -110,7 +121,7 @@ export class DartClassDataProvider {
             } as CodeValue);
         }
 
-        this.provider.insert(...insertions, ...this.changes);
+        this.provider.insert(...insertions, ...this.values);
     }
 }
 
@@ -118,7 +129,7 @@ class ConstructorCode implements CodeValue {
     value: string;
 
     constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
-        this.value = '\t' + new DartCodeGenerator(element).writeConstructor().generate()
+        this.value = '\t' + new DartCodeGenerator(element).writeConstructor().generate();
     }
 
     get replacement(): string {
@@ -300,7 +311,10 @@ class FromJsonCode implements CodeValue {
     }
 
     get isUpdated(): boolean {
-        return this.provider.has(this.value);
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
     }
 
     fix(): vscode.CodeAction {
@@ -338,7 +352,10 @@ class ToJsonCode implements CodeValue {
     }
 
     get isUpdated(): boolean {
-        return this.provider.has(this.value);
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
     }
 
     fix(): vscode.CodeAction {

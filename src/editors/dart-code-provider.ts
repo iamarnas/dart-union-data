@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { DartClassDataProvider } from '.';
-import { ElementBuilder } from '../interface';
+import { DartClassDataProvider, DartEnumDataProvider } from '.';
+import { ElementBuilder, ElementKind } from '../interface';
 import { ClassDataTemplate } from '../templates';
 import { regexp } from '../utils';
 import { CodeReader } from './code-reader';
@@ -31,8 +31,14 @@ export class DartCodeProvider extends CodeReader {
     }
 
     get data(): DartClassDataProvider | undefined {
-        if (this.element) {
+        if (this.element && this.element.kind === ElementKind.class) {
             return new DartClassDataProvider(this, this.element);
+        }
+    }
+
+    get enum(): DartEnumDataProvider | undefined {
+        if (this.element && this.element.kind === ElementKind.enum) {
+            return new DartEnumDataProvider(this, this.element);
         }
     }
 
@@ -134,19 +140,19 @@ export class DartCodeProvider extends CodeReader {
         return action;
     }
 
-    replace(...replacements: CodeValue[]) {
+    replace(...values: Array<Pick<CodeValue, 'range' | 'value' | 'isUpdated'>>) {
         this.editor.edit((editBuilder) => {
-            replacements.forEach((element) => {
-                if (element.range) {
-                    editBuilder.replace(element.range, element.value)
+            values.forEach((element) => {
+                if (element.range && !element.isUpdated) {
+                    editBuilder.replace(element.range, element.value);
                 }
             });
         });
     }
 
-    insert(...insertions: CodeValue[]) {
+    insert(...values: Array<Pick<CodeValue, 'position' | 'replacement'>>) {
         this.editor.edit((editBuilder) => {
-            insertions.forEach((element) => editBuilder.insert(element.position, element.replacement));
+            values.forEach((element) => editBuilder.insert(element.position, element.replacement));
         });
     }
 }

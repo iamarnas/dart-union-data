@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { GENERATE_DATA, UPDATE_DATA } from './editors';
+import { GENERATE_COMMAND, UPDATE_COMMAND } from './editors';
 import { DartCodeActionProvider } from './models/dart-code-action-provider';
 
 // this method is called when your extension is activated
@@ -30,11 +30,11 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(UPDATE_DATA, () => dartCodeActionProvider.code.data?.updateChanges())
+		vscode.commands.registerCommand(UPDATE_COMMAND, () => dartCodeActionProvider.code.data?.updateChanges())
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(GENERATE_DATA, () => dartCodeActionProvider.code.data?.generateData())
+		vscode.commands.registerCommand(GENERATE_COMMAND, () => dartCodeActionProvider.code.data?.generateData())
 	);
 
 	context.subscriptions.push(actions);
