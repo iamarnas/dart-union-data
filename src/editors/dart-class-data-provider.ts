@@ -166,6 +166,10 @@ class ConstructorCode implements CodeValue {
             this.replacement,
         );
     }
+
+    update() {
+        this.provider.replace(this);
+    }
 }
 
 class ToStringCode implements CodeValue {
@@ -204,6 +208,10 @@ class ToStringCode implements CodeValue {
             'Generate to String Method',
             this.replacement,
         );
+    }
+
+    update() {
+        this.provider.replace(this);
     }
 }
 
@@ -244,6 +252,10 @@ class FromMapCode implements CodeValue {
             this.replacement,
         );
     }
+
+    update() {
+        this.provider.replace(this);
+    }
 }
 
 class ToMapCode implements CodeValue {
@@ -282,6 +294,10 @@ class ToMapCode implements CodeValue {
             'Generate toMap Map',
             this.replacement,
         );
+    }
+
+    update() {
+        this.provider.replace(this);
     }
 }
 
@@ -324,6 +340,10 @@ class FromJsonCode implements CodeValue {
             this.replacement,
         );
     }
+
+    update() {
+        this.provider.replace(this);
+    }
 }
 
 class ToJsonCode implements CodeValue {
@@ -364,5 +384,9 @@ class ToJsonCode implements CodeValue {
             'Generate to JSON Codecs',
             this.replacement,
         );
+    }
+
+    update() {
+        this.provider.replace(this);
     }
 }

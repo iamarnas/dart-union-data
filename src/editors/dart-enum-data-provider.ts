@@ -2,8 +2,10 @@ import * as vscode from 'vscode';
 import { EnumDataGenerator } from '../generators';
 import { ElementKind } from '../interface';
 import { ClassDataTemplate } from '../templates';
-import { identicalCode, regexp } from '../utils';
+import { identicalCode } from '../utils';
 import { CodeValue, DartCodeProvider } from './dart-code-provider';
+
+export const UPDATE_ENUM_COMMAND = 'update.enum.data';
 
 export class DartEnumDataProvider {
     private readonly enum: EnumDataGenerator;
@@ -11,7 +13,7 @@ export class DartEnumDataProvider {
 
     constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
         if (element.kind !== ElementKind.enum) {
-            console.error('Syntax error due to invalid element type');
+            console.error('DartEnumDataProvider: Syntax error due to invalid element type');
         }
 
         this.enum = new EnumDataGenerator(element);
@@ -58,6 +60,31 @@ export class DartEnumDataProvider {
         );
     }
 
+    updateChanges() {
+        if (this.element.isEnhancedEnum) {
+            if (this.extension.isGenerated && !this.extension.isUpdated) {
+                this.extension.update();
+                return;
+            }
+
+            this.provider.replace(...this.methods);
+            this.provider.replace(...this.checkers);
+
+            //this.values.filter((e) => e.isGenerated).forEach((e) => e.update());
+            return;
+        }
+
+        this.extension.update();
+    }
+
+    updateCommand(): vscode.CodeAction {
+        return this.provider.command({
+            command: UPDATE_ENUM_COMMAND,
+            title: 'Update All Changes',
+            tooltip: 'This will update all enum members',
+        });
+    }
+
     private get checkersAndMethods(): string {
         const checkers = '\n' + this.checkers.map((e) => e.replacement).join('');
         const methods = this.methods.map((e) => e.replacement).join('');
@@ -97,7 +124,7 @@ export class DartEnumDataProvider {
     }
 
     get hasData(): boolean {
-        return this.values.some((e) => e.isGenerated);
+        return this.hasChanges || this.hasMethods;
     }
 
     get hasCheckers(): boolean {
@@ -106,6 +133,12 @@ export class DartEnumDataProvider {
 
     get hasMethods(): boolean {
         return this.methods.length !== 0 && this.methods.some((e) => e.isGenerated);
+    }
+
+    get hasChanges(): boolean {
+        const generated = this.values.filter((e) => e.isGenerated);
+        if (generated.length === 0) return false;
+        return generated.some((e) => !e.isUpdated);
     }
 }
 
@@ -152,6 +185,10 @@ class EnumExtensionCode implements CodeValue {
             this.replacement,
         );
     }
+
+    update() {
+        this.provider.replace(this);
+    }
 }
 
 class EnumCheckerCode implements CodeValue {
@@ -167,9 +204,8 @@ class EnumCheckerCode implements CodeValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.lines.find((line) => {
-            return !regexp.classMatch.test(line.text) && line.text.includes(this.value);
-        })?.range;
+        const lines = this.provider.whereTextLine([this.value]);
+        return lines.length !== 0 ? lines[0].range : undefined;
     }
 
     get replacement(): string {
@@ -189,6 +225,10 @@ class EnumCheckerCode implements CodeValue {
             'Generate Enum Checker',
             this.replacement,
         );
+    }
+
+    update() {
+        this.provider.replace(this);
     }
 }
 
@@ -228,5 +268,9 @@ class EnumMehtodCode implements CodeValue {
             'Generate Enum Method',
             this.replacement,
         );
+    }
+
+    update() {
+        this.provider.replace(this);
     }
 }

@@ -89,12 +89,12 @@ export abstract class CodeReader {
      */
     whereTextLine(characters: string[], lines?: vscode.TextLine[]): vscode.TextLine[] {
         const buffer: vscode.TextLine[] = [];
+        const textLines = lines ?? this.lines;
         const startOfCommnet = regexp.combine(regexp.startOfComment, /^\s*\*/);
 
-        for (const line of lines ?? this.lines) {
-            if (startOfCommnet.test(line.text)) continue;
-
+        for (const line of textLines) {
             if (characters.every((e) => line.text.indexOf(e) !== -1)) {
+                if (startOfCommnet.test(line.text)) continue;
                 buffer.push(line);
             }
         }
@@ -145,14 +145,14 @@ export abstract class CodeReader {
 
         if (!start) return;
 
-        const isWithinCurlyBrackets = start.text.trimEnd().endsWith('{');
-        const hasParentheses = start.text.indexOf('(') !== - 1;
-        const openBraket = isWithinCurlyBrackets ? '{' : '(';
-        const closeBraket = isWithinCurlyBrackets ? '}' : ')';
+        const hasCurly = start.text.indexOf('{') !== -1;
+        const hasParentheses = start.text.indexOf('(') !== -1;
+        const openBraket = hasCurly ? '{' : '(';
+        const closeBraket = hasCurly ? '}' : ')';
         const error = `Could not find code from the given first line: ${split[0]}. Check if your code is valid and includes '{}' or '()' brackets.`;
         let lastLineNumber = 0, a = 0, b = 0;
 
-        if (!isWithinCurlyBrackets && !hasParentheses) {
+        if (!hasCurly && !hasParentheses) {
             console.error(error);
             return;
         }
@@ -197,7 +197,9 @@ export abstract class CodeReader {
         for (let i = position.line; i > -1; i--) {
             const line = this.lines[i];
 
-            if (typeof predicate === 'string' && predicate.match(line.text) !== null) {
+            if (line.text.startsWith('}')) return;
+
+            if (typeof predicate === 'string' && line.text.indexOf(predicate) !== -1) {
                 return this.findCodeRange(line.text);
             }
 

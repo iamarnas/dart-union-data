@@ -1,7 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { GENERATE_COMMAND, UPDATE_COMMAND } from './editors';
+import { GENERATE_COMMAND, UPDATE_COMMAND, UPDATE_ENUM_COMMAND } from './editors';
 import { DartCodeActionProvider } from './models/dart-code-action-provider';
 
 // this method is called when your extension is activated
@@ -11,7 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	if (!editor) return;
 
-	const dartCodeActionProvider = new DartCodeActionProvider(editor);
+	const provider = new DartCodeActionProvider(editor);
 
 	// const a = vscode.window.onDidChangeTextEditorSelection((event) => {
 	// 	console.log(event.textEditor.selection);
@@ -25,16 +25,20 @@ export function activate(context: vscode.ExtensionContext) {
 		scheme: 'file',
 		language: 'dart',
 	},
-		dartCodeActionProvider, {
+		provider, {
 		providedCodeActionKinds: DartCodeActionProvider.providedCodeActionKinds,
 	});
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(UPDATE_COMMAND, () => dartCodeActionProvider.code.data?.updateChanges())
+		vscode.commands.registerCommand(UPDATE_COMMAND, () => provider.code.data?.updateChanges())
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(GENERATE_COMMAND, () => dartCodeActionProvider.code.data?.generateData())
+		vscode.commands.registerCommand(GENERATE_COMMAND, () => provider.code.data?.generateData())
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand(UPDATE_ENUM_COMMAND, () => provider.code.enum?.updateChanges())
 	);
 
 	context.subscriptions.push(actions);

@@ -140,19 +140,21 @@ export class DartCodeProvider extends CodeReader {
         return action;
     }
 
-    replace(...values: Array<Pick<CodeValue, 'range' | 'value' | 'isUpdated'>>) {
+    replace(...values: Array<Pick<CodeValue, 'range' | 'value'>>) {
         this.editor.edit((editBuilder) => {
-            values.forEach((element) => {
-                if (element.range && !element.isUpdated) {
+            for (const element of values) {
+                if (element.range) {
                     editBuilder.replace(element.range, element.value);
                 }
-            });
+            }
         });
     }
 
     insert(...values: Array<Pick<CodeValue, 'position' | 'replacement'>>) {
         this.editor.edit((editBuilder) => {
-            values.forEach((element) => editBuilder.insert(element.position, element.replacement));
+            for (const element of values) {
+                editBuilder.insert(element.position, element.replacement);
+            }
         });
     }
 }
@@ -165,4 +167,5 @@ export interface CodeValue {
     isUpdated: boolean,
     range: vscode.Range | undefined;
     fix(): vscode.CodeAction
+    update(): void,
 }

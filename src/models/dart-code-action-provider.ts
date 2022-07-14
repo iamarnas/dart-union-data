@@ -11,7 +11,11 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
     constructor(public editor: vscode.TextEditor) {
         this.code = new DartCodeProvider(editor);
 
-        vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
+        // vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
+        //     this.code = new DartCodeProvider(event.textEditor);
+        // });
+
+        vscode.window.onDidChangeTextEditorSelection((event) => {
             this.code = new DartCodeProvider(event.textEditor);
         });
     }
@@ -44,10 +48,15 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
             if (enumCode.isEmpty) return;
 
             if (element.isEnhancedEnum) {
-                if (enumCode.extension.isGenerated) return;
+                if (enumCode.extension.isUpdated) return;
 
-                if (!enumCode.extension.isGenerated) {
+                if (!enumCode.extension.isGenerated && !enumCode.hasData) {
                     actions.push(enumCode.extension.fix());
+                }
+
+                if (enumCode.extension.isGenerated && !enumCode.extension.isUpdated) {
+                    actions.push(enumCode.updateCommand());
+                    return actions;
                 }
 
                 if (!enumCode.hasData) {
@@ -62,7 +71,15 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
                     actions.push(enumCode.methodsFix());
                 }
 
+                if (enumCode.hasChanges) {
+                    actions.push(enumCode.updateCommand());
+                }
+
                 return actions;
+            }
+
+            if (enumCode.hasChanges) {
+                actions.push(enumCode.updateCommand());
             }
 
             if (!enumCode.extension.isGenerated) {
