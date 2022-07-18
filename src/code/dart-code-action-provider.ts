@@ -1,25 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import * as vscode from 'vscode';
-import { DartCodeProvider, DartEnumDataProvider } from '../editors';
+import { DartCodeProvider } from '.';
 import { ElementKind } from '../interface';
 import '../types/array';
 import '../types/string';
 
-export class DartCodeActionProvider implements vscode.CodeActionProvider {
-    code: DartCodeProvider;
-
-    constructor(public editor: vscode.TextEditor) {
-        this.code = new DartCodeProvider(editor);
-
-        // vscode.window.onDidChangeTextEditorVisibleRanges((event) => {
-        //     this.code = new DartCodeProvider(event.textEditor);
-        // });
-
-        vscode.window.onDidChangeTextEditorSelection((event) => {
-            this.code = new DartCodeProvider(event.textEditor);
-        });
-    }
-
+export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.CodeAction> {
     provideCodeActions(
         document: vscode.TextDocument,
         range: vscode.Range | vscode.Selection,
@@ -36,30 +22,35 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
 
     private dartCodeActions(document: vscode.TextDocument, range: vscode.Range): vscode.CodeAction[] | undefined {
         const actions: vscode.CodeAction[] = [];
-        const element = this.code.element;
+        const provider = new DartCodeProvider(document, range);
+        const element = provider.element;
 
-        if (!element || !this.code.range) return;
+        if (!element || !provider.range) return;
+
+        // Obs! The order of the `if` statements in this code is important.
+        // Changing positions can lead to false or unnecessary quick-fix predictions.
 
         if (element.kind === ElementKind.enum) {
-            const enumCode = new DartEnumDataProvider(this.code, element);
+            const enumCode = provider.enum;
+
+            if (!enumCode) return;
 
             console.log(enumCode);
 
             if (enumCode.isEmpty) return;
+            if (enumCode.extension.isUpdated) return;
 
             if (element.isEnhancedEnum) {
-                if (enumCode.extension.isUpdated) return;
-
                 if (!enumCode.extension.isGenerated && !enumCode.hasData) {
                     actions.push(enumCode.extension.fix());
                 }
 
                 if (enumCode.extension.isGenerated && !enumCode.extension.isUpdated) {
-                    actions.push(enumCode.updateCommand());
+                    actions.push(enumCode.updateCommand(enumCode));
                     return actions;
                 }
 
-                if (!enumCode.hasData) {
+                if (!enumCode.hasData && !enumCode.hasCheckers && !enumCode.hasMethods) {
                     actions.push(enumCode.enumDataFix());
                 }
 
@@ -72,14 +63,14 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
                 }
 
                 if (enumCode.hasChanges) {
-                    actions.push(enumCode.updateCommand());
+                    actions.push(enumCode.updateCommand(enumCode));
                 }
 
                 return actions;
             }
 
             if (enumCode.hasChanges) {
-                actions.push(enumCode.updateCommand());
+                actions.push(enumCode.updateCommand(enumCode));
             }
 
             if (!enumCode.extension.isGenerated) {
@@ -90,16 +81,18 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider {
         }
 
         if (element.kind === ElementKind.class) {
-            const dartCode = this.code.data;
+            const dartCode = provider.data;
 
             if (!element.hasData || !dartCode) return;
 
+            console.log(dartCode);
+
             if (dartCode.hasNoDataCreated) {
-                actions.push(dartCode.generateCommand());
+                actions.push(dartCode.generateCommand(dartCode));
             }
 
             if (dartCode.hasChanges) {
-                actions.push(dartCode.updateCommand());
+                actions.push(dartCode.updateCommand(dartCode));
             }
 
             if (!dartCode.constructorCode.isGenerated) {

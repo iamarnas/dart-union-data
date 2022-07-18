@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { EnumDataGenerator } from '../generators';
-import { ElementKind } from '../interface';
-import { ClassDataTemplate } from '../templates';
-import { identicalCode } from '../utils';
+import { EnumDataGenerator } from '../../generators';
+import { ElementKind } from '../../interface';
+import { ClassDataTemplate } from '../../templates';
+import { identicalCode } from '../../utils';
 import { CodeValue, DartCodeProvider } from './dart-code-provider';
 
 export const UPDATE_ENUM_COMMAND = 'update.enum.data';
@@ -21,7 +21,7 @@ export class DartEnumDataProvider {
     }
 
     checkersRange() {
-        return this.provider.rangeFromTextLines(...this.checkersLines());
+        return this.provider.rangeFromTextLines(...this.previousCheckers);
     }
 
     methodRanges(): vscode.Range[] {
@@ -61,27 +61,82 @@ export class DartEnumDataProvider {
     }
 
     updateChanges() {
+        const editor = this.provider.editor;
+        if (!editor || this.provider.document.languageId !== 'dart') return;
+
         if (this.element.isEnhancedEnum) {
             if (this.extension.isGenerated && !this.extension.isUpdated) {
                 this.extension.update();
                 return;
             }
 
-            this.provider.replace(...this.methods);
-            this.provider.replace(...this.checkers);
+            let lineNumber = this.previousCheckers[this.previousCheckers.length - 1].range?.end.line
+                ?? this.provider.endPositionWithinCode().line;
 
-            //this.values.filter((e) => e.isGenerated).forEach((e) => e.update());
+            if (this.hasCheckers) {
+                editor.edit((builder) => {
+                    // Insertion.
+                    if (this.checkers.length >= this.previousCheckers.length) {
+                        for (let i = 0; i < this.checkers.length; i++) {
+                            const curr = this.checkers[i];
+
+                            if (i <= this.previousCheckers.length - 1) {
+                                const prev = this.previousCheckers[i];
+
+                                if (!prev.text.includes(curr.value)) {
+                                    builder.replace(prev.range, '\t' + curr.value);
+                                }
+
+                                continue;
+                            }
+
+                            if (i > this.previousCheckers.length - 1) {
+                                lineNumber++;
+                                builder.insert(this.provider.lineAt(lineNumber).range.start, curr.replacement);
+                            }
+                        }
+                    }
+
+                    // Removing.
+                    if (this.checkers.length < this.previousCheckers.length) {
+                        for (let i = 0; i < this.previousCheckers.length; i++) {
+                            const prev = this.previousCheckers[i];
+
+                            if (i <= this.checkers.length - 1) {
+                                const curr = this.checkers[i];
+
+                                if (!prev.text.includes(curr.value)) {
+                                    builder.replace(prev.range, '\t' + curr.value);
+                                }
+
+                                continue;
+                            }
+
+                            const start = this.provider.lineAt(prev.range.start.line - 1).range.end;
+                            builder.delete(new vscode.Range(start, prev.range.end));
+                        }
+                    }
+
+                    for (const method of this.methods) {
+                        if (method.range) {
+                            builder.replace(method.range, method.value);
+                        }
+                    }
+                });
+            }
+
             return;
         }
 
         this.extension.update();
     }
 
-    updateCommand(): vscode.CodeAction {
+    updateCommand(...args: any[]): vscode.CodeAction {
         return this.provider.command({
             command: UPDATE_ENUM_COMMAND,
             title: 'Update All Changes',
             tooltip: 'This will update all enum members',
+            arguments: args,
         });
     }
 
@@ -91,7 +146,7 @@ export class DartEnumDataProvider {
         return checkers.concat(methods);
     }
 
-    private checkersLines(): vscode.TextLine[] {
+    private get previousCheckers(): vscode.TextLine[] {
         if (this.element.isEnhancedEnum) {
             return this.provider.whereTextLine(this.enum.checkerElements, this.provider.codeLines);
         }
@@ -103,12 +158,16 @@ export class DartEnumDataProvider {
         return this.enum.checkers.map((value) => new EnumCheckerCode(this.provider, value));
     }
 
+    get hasCheckers(): boolean {
+        return this.previousCheckers.length !== 0;
+    }
+
     get methods(): EnumMehtodCode[] {
         if (this.element.isEnhancedEnum) {
             return this.enum.methods.map((value) => new EnumMehtodCode(
                 this.provider,
                 value,
-                this.provider.lines,
+                this.provider.codeLines,
             ));
         }
 
@@ -124,21 +183,17 @@ export class DartEnumDataProvider {
     }
 
     get hasData(): boolean {
-        return this.hasChanges || this.hasMethods;
-    }
-
-    get hasCheckers(): boolean {
-        return this.checkers.length !== 0 && this.checkers.some((e) => e.isGenerated);
+        return this.hasCheckers || this.hasMethods;
     }
 
     get hasMethods(): boolean {
-        return this.methods.length !== 0 && this.methods.some((e) => e.isGenerated);
+        return this.methods.filter((e) => e.isGenerated).length !== 0;
     }
 
     get hasChanges(): boolean {
-        const generated = this.values.filter((e) => e.isGenerated);
-        if (generated.length === 0) return false;
-        return generated.some((e) => !e.isUpdated);
+        return this.values.filter((e) => e.isGenerated).some((e) => !e.isUpdated)
+            || this.hasCheckers && this.checkers.length !== this.previousCheckers.length
+            || this.hasCheckers && this.checkers.some((e) => !e.isUpdated);
     }
 }
 
@@ -153,8 +208,8 @@ class EnumExtensionCode implements CodeValue {
     }
 
     get position(): vscode.Position {
-        const end = this.provider.editor.document.lineCount - 1;
-        return this.provider.editor.document.lineAt(end).range.end;
+        const end = this.provider.document.lineCount - 1;
+        return this.provider.document.lineAt(end).range.end;
     }
 
     get isGenerated(): boolean {
@@ -166,7 +221,7 @@ class EnumExtensionCode implements CodeValue {
     }
 
     get replacement(): string {
-        const textLine = this.provider.editor.document.lineAt(this.position);
+        const textLine = this.provider.document.lineAt(this.position);
         const spacing = textLine.isEmptyOrWhitespace ? '\n' : '\n\n';
         return spacing + this.value + '\n';
     }

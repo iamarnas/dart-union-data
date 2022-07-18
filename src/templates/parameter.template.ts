@@ -1,4 +1,4 @@
-import { ParameterExpression } from '../codecs/parameter-codec';
+import { ParameterExpression } from '../codecs/dart-parameter-codec';
 import { Parameter } from '../models/parameter';
 import { ParameterConverter } from '../models/parameter-converter';
 import '../types/array';

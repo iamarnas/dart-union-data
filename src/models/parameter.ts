@@ -1,4 +1,4 @@
-import { ParameterCodec, ParameterExpression } from '../codecs/parameter-codec';
+import { DartParameterCodec, ParameterExpression } from '../codecs/dart-parameter-codec';
 import { ParameterElement, typeIdentities, TypeIdentity } from '../interface/element';
 
 const nullablePrimitiveTypes = ['int?', 'double?', 'num?', 'String?', 'bool?', 'dynamic?', 'Object?'] as const;
@@ -95,7 +95,7 @@ export class Parameter implements ParameterElement {
      * @returns parameter as string.
      */
     expression(expression: ParameterExpression = 'instance-variable'): string {
-        const codec = new ParameterCodec();
+        const codec = new DartParameterCodec();
         return codec.decode(this, expression);
     }
 }

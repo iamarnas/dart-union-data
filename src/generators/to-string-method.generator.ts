@@ -1,4 +1,4 @@
-import { ClassDataTemplate, ConstructorTemplate, GenericTypeTemplate, ParametersTemplate } from '../templates';
+import { ClassDataTemplate, GenericTypeTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
 import { StringBuffer } from '../utils/string-buffer';
 
 export class ToStringMethodGenerator {
@@ -8,14 +8,14 @@ export class ToStringMethodGenerator {
     private className: string;
     private isOverridable = false;
 
-    constructor(private element: ConstructorTemplate | ClassDataTemplate) {
-        this.parameters = element instanceof ConstructorTemplate
+    constructor(private element: SubclassTemplate | ClassDataTemplate) {
+        this.parameters = element instanceof SubclassTemplate
             ? element.parameters
-            : element.instanceVariables;
-        this.generic = element instanceof ConstructorTemplate
+            : element.instances;
+        this.generic = element instanceof SubclassTemplate
             ? element.superclass.generic
             : element.generic;
-        this.className = element instanceof ConstructorTemplate
+        this.className = element instanceof SubclassTemplate
             ? element.subclassName
             : element.name;
     }

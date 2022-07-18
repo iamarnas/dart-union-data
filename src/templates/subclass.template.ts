@@ -3,7 +3,7 @@ import { ConstructorElement, ConstructorTypes } from '../interface';
 import '../types/string';
 import { regexp } from '../utils';
 
-export class ConstructorTemplate implements ConstructorElement {
+export class SubclassTemplate implements ConstructorElement {
     type: ConstructorTypes = ConstructorTypes.generative;
     name = '';
     displayName = '';
@@ -17,7 +17,7 @@ export class ConstructorTemplate implements ConstructorElement {
         this.displayName = getConstructorDisplayName(source);
         this.name = getConstructorName(superclass.name, this.displayName);
         this.parameters = ParametersTemplate.from(this.displayName)
-            .included(...superclass.instanceVariables.all)
+            .included(...superclass.instances.all)
             .included(...superclass.getters.all);
     }
 
@@ -39,7 +39,7 @@ export class ConstructorTemplate implements ConstructorElement {
      * A class data type without extendable types.
      * @example Result<T, E>
      */
-    get typeInference(): string {
+    get typeInterface(): string {
         return this.subclassName + this.superclass.generic.type;
     }
 

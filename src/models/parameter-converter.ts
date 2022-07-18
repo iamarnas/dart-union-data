@@ -1,4 +1,4 @@
-import { ParameterCodec } from '../codecs/parameter-codec';
+import { DartParameterCodec } from '../codecs/dart-parameter-codec';
 import '../types/string';
 import { Parameter } from './parameter';
 
@@ -6,7 +6,7 @@ import { Parameter } from './parameter';
  * A class that converts parameters from a given string.
  * - **Note:** `input` must contain a constructor `(...)` to determine parameters range.
  */
-export class ParameterConverter extends ParameterCodec {
+export class ParameterConverter extends DartParameterCodec {
     private constructorRegx = /\((.*)\)/;
     private namedParamsRegx = /\{(.*)\}/;
     private positionalParamsRegx = /\[(.*)\]/;

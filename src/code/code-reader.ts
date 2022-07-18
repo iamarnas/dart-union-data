@@ -91,10 +91,13 @@ export abstract class CodeReader {
         const buffer: vscode.TextLine[] = [];
         const textLines = lines ?? this.lines;
         const startOfCommnet = regexp.combine(regexp.startOfComment, /^\s*\*/);
+        const isValid = (text: string) => characters.every((e) => text.indexOf(e) !== -1);
+        const isCommet = (text: string) => startOfCommnet.test(text);
 
         for (const line of textLines) {
-            if (characters.every((e) => line.text.indexOf(e) !== -1)) {
-                if (startOfCommnet.test(line.text)) continue;
+            if (isCommet(line.text)) continue;
+
+            if (!isCommet(line.text) && isValid(line.text)) {
                 buffer.push(line);
             }
         }

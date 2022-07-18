@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { DartClassDataProvider, DartEnumDataProvider } from '.';
-import { ElementBuilder, ElementKind } from '../interface';
-import { ClassDataTemplate } from '../templates';
-import { regexp } from '../utils';
-import { CodeReader } from './code-reader';
+import { ElementBuilder, ElementKind } from '../../interface';
+import { ClassDataTemplate } from '../../templates';
+import { regexp } from '../../utils';
+import { CodeReader } from '../code-reader';
 
 /**
  * A data class that provides the Dart class range from the text document
@@ -20,10 +20,10 @@ export class DartCodeProvider extends CodeReader {
      */
     readonly end: vscode.Position;
 
-    constructor(public editor: vscode.TextEditor) {
-        super(editor.document);
-        this.selection = editor.document.lineAt(editor.selection.start.line);
-        this.end = this.range?.end ?? editor.selection.end;
+    constructor(public document: vscode.TextDocument, selection: vscode.Range) {
+        super(document);
+        this.selection = document.lineAt(selection.start.line);
+        this.end = this.range?.end ?? selection.end;
     }
 
     get element(): ClassDataTemplate | undefined {
@@ -118,7 +118,7 @@ export class DartCodeProvider extends CodeReader {
         const fix = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
         fix.edit = new vscode.WorkspaceEdit();
         fix.isPreferred = true;
-        fix.edit.insert(this.editor.document.uri, position, text);
+        fix.edit.insert(this.document.uri, position, text);
         return fix;
     }
 
@@ -130,17 +130,22 @@ export class DartCodeProvider extends CodeReader {
         const fix = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
         fix.edit = new vscode.WorkspaceEdit();
         fix.isPreferred = true;
-        fix.edit.replace(this.editor.document.uri, range, text);
+        fix.edit.replace(this.document.uri, range, text);
         return fix;
     }
 
-    command(command: vscode.Command | undefined): vscode.CodeAction {
-        const action = new vscode.CodeAction(command?.title ?? '', vscode.CodeActionKind.QuickFix);
+    command(command: vscode.Command): vscode.CodeAction {
+        const action = new vscode.CodeAction(command.title, vscode.CodeActionKind.QuickFix);
         action.command = command;
         return action;
     }
 
+    get editor(): vscode.TextEditor | undefined {
+        return vscode.window.activeTextEditor;
+    }
+
     replace(...values: Array<Pick<CodeValue, 'range' | 'value'>>) {
+        if (!this.editor) return;
         this.editor.edit((editBuilder) => {
             for (const element of values) {
                 if (element.range) {
@@ -151,11 +156,24 @@ export class DartCodeProvider extends CodeReader {
     }
 
     insert(...values: Array<Pick<CodeValue, 'position' | 'replacement'>>) {
+        if (!this.editor) return;
         this.editor.edit((editBuilder) => {
             for (const element of values) {
                 editBuilder.insert(element.position, element.replacement);
             }
         });
+    }
+
+    replaceWithEmpty(range: vscode.Range): vscode.Range | undefined {
+        if (range !== undefined) {
+            // const start = new vscode.Position(
+            //     range.start.line - 1,
+            //     this.lineAt(range.start.line - 1).range.end.character,
+            // );
+            const start = this.lineAt(range.start.line - 1).range.end;
+            const end = new vscode.Position(range.end.line, range.end.character);
+            return new vscode.Range(start, end);
+        }
     }
 }
 

@@ -1,4 +1,4 @@
-import { ClassDataTemplate, ConstructorTemplate, GenericTypeTemplate, ParametersTemplate } from '../templates';
+import { ClassDataTemplate, GenericTypeTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
 import { StringBuffer } from '../utils/string-buffer';
 
 export class CopyWithGenerator {
@@ -8,10 +8,10 @@ export class CopyWithGenerator {
     private readonly generic: GenericTypeTemplate;
     private sb: StringBuffer = new StringBuffer();
 
-    constructor(private readonly element: ConstructorTemplate | ClassDataTemplate) {
-        this.implementationType = element.typeInference;
+    constructor(private readonly element: SubclassTemplate | ClassDataTemplate) {
+        this.implementationType = element.typeInterface;
         this.parameters = element instanceof ClassDataTemplate
-            ? element.instanceVariables
+            ? element.instances
             : element.parameters;
         this.generic = element instanceof ClassDataTemplate
             ? element.generic
@@ -21,7 +21,7 @@ export class CopyWithGenerator {
             : element.subclassName + 'CopyWith';
     }
 
-    static fromElement(element: ConstructorTemplate | ClassDataTemplate): CopyWithGenerator {
+    static fromElement(element: SubclassTemplate | ClassDataTemplate): CopyWithGenerator {
         return new CopyWithGenerator(element);
     }
 
@@ -95,7 +95,7 @@ export class CopyWithGenerator {
     }
 
     private writeImplementation() {
-        const className = this.element instanceof ConstructorTemplate
+        const className = this.element instanceof SubclassTemplate
             ? this.element.subclassName
             : this.element.name;
         this.sb.writeln(`class _${this.className}${this.generic.displayType}`);

@@ -1,6 +1,6 @@
 import { Settings } from '../models/settings';
 import pubspec from '../shared/pubspec';
-import { ClassDataTemplate, ConstructorTemplate, hasConstructor, isFactory, isNamedConstructor, isPrivate, ParametersTemplate } from '../templates';
+import { ClassDataTemplate, hasConstructor, isFactory, isNamedConstructor, isPrivate, ParametersTemplate, SubclassTemplate } from '../templates';
 import { regexp, trim } from '../utils';
 import { ElementKind, FieldElement } from './element';
 
@@ -25,7 +25,7 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
 
     const sttings = new Settings({
         sdkVersion: pubspec.sdkVersion,
-        equatable: split[0].includes('Equatable '),
+        equatable: split[0].includes(' Equatable'),
     });
     const element = new ClassDataTemplate(split[0], sttings);
 
@@ -235,7 +235,7 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
 
             if (isInitialized) continue;
 
-            const constructor = new ConstructorTemplate(element, field);
+            const constructor = new SubclassTemplate(element, field);
             element.addConstructor(constructor);
         }
     }

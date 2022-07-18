@@ -1,9 +1,8 @@
-import { ToStringMethodGenerator } from '.';
-import { ParameterExpression } from '../codecs/parameter-codec';
+import { EqualityGenerator, ToStringMethodGenerator } from '.';
+import { ParameterExpression } from '../codecs/dart-parameter-codec';
 import { Settings } from '../models/settings';
 import { isDebugMode } from '../shared/constants';
-import pubspec from '../shared/pubspec';
-import { ConstructorTemplate, GenericTypeTemplate, ParametersTemplate } from '../templates';
+import { GenericTypeTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
 import { StringBuffer } from '../utils/string-buffer';
 import { ConstructorGenerator } from './constructor.generator';
 
@@ -15,7 +14,7 @@ export class SubclassGenerator {
     private sb: StringBuffer = new StringBuffer();
 
     constructor(
-        private readonly element: ConstructorTemplate,
+        private readonly element: SubclassTemplate,
         readonly className: string,
     ) {
         this.subclass = element.subclassName;
@@ -40,38 +39,13 @@ export class SubclassGenerator {
         this.sb.writeln();
         this.writeToString();
         this.sb.writeln();
-
-        if (this.settings.equatable) {
-            this.writeEquatableProps();
-        } else {
-            this.writeEqualityOperator();
-            this.sb.writeln();
-            this.writeHashCodeGetter();
-        }
-
+        this.writeEqualityOperator();
         this.writeClassEnd();
         return this.sb.toString();
     }
 
-    /**
-     * @example name == other.name
-     */
-    private get equals(): string[] {
-        return this.parameters.expressionsOf('equal-to-other');
-    }
-
-    /**
-     * @example value
-     */
-    private get names(): string[] {
-        return this.parameters.expressionsOf('name');
-    }
-
-    /**
-     * @example name.hashCode
-     */
-    private get hashCodes(): string[] {
-        return this.parameters.expressionsOf('hashCode');
+    private writeEqualityOperator() {
+        this.sb.writeln(new EqualityGenerator(this.element).generateEquality());
     }
 
     /**
@@ -115,94 +89,6 @@ export class SubclassGenerator {
             .asOverridable()
             .writeCode()
             .generate();
-    }
-
-    private writeEqualityOperator() {
-        const values = !this.equals.length ? ';' : ` && ${this.equals.join(' && ')};`;
-        const expression = `return other is ${this.element.typeInference}${values}`;
-
-        this.sb.writeln('@override', 1);
-        this.sb.writeln('bool operator ==(Object other) {', 1);
-        this.sb.writeln('if (runtimeType != other.runtimeType) return false;', 2);
-
-        if (expression.length < 76) {
-            this.sb.writeln(expression, 2);
-        } else {
-            // Block
-            this.sb.writeln(`return other is ${this.element.typeInference} &&\n`, 2);
-            this.sb.writeAll(this.equals, ' &&\n', 4);
-            this.sb.write(';');
-        }
-
-        this.sb.writeln('}', 1);
-    }
-
-    // TODO: do not write if equatable enabled.
-    private writeHashCodeGetter() {
-        if (pubspec.sdkVersion >= 2.14) {
-            this.writeHashCodeObjects();
-        } else {
-            this.writeHashCodes();
-        }
-    }
-
-    private writeHashCodes() {
-        const getter = 'int get hashCode => ';
-        const hashCodes = !this.hashCodes.length ? '0;' : `${this.hashCodes.join(' ^ ')};`;
-        const expression = `${getter}${hashCodes}`;
-
-        this.sb.writeln('@override', 1);
-
-        if (expression.length < 78) {
-            this.sb.writeln(expression, 1);
-        } else {
-            // Block
-            this.sb.writeln(getter + '\n', 1);
-            this.sb.writeAll(this.hashCodes, ' ^\n', 3);
-            this.sb.write(';');
-        }
-    }
-
-    private writeHashCodeObjects() {
-        const getter = 'int get hashCode => ';
-        const objects = !this.names.length ? '0;' : `${this.names.join(', ')}`;
-        const expression = `${getter}Object.hash(${objects});`;
-
-        this.sb.writeln('@override', 1);
-        // Object.hash() requires at least two values.
-        if (this.names.length > 1) {
-            if (expression.length < 78) {
-                this.sb.writeln(expression, 1);
-            } else {
-                // Block
-                this.sb.writeln(`${getter}Object.hash(`, 1);
-                this.sb.writeBlock(this.names, ',', 4);
-                this.sb.writeln(');', 2);
-            }
-        } else {
-            if (this.parameters.isEmpty) {
-                this.sb.writeln(`${getter}${objects}`, 1);
-                return;
-            }
-
-            this.sb.writeln(`${getter}${objects}.hashCode;`, 1);
-        }
-    }
-
-    private writeEquatableProps() {
-        const getter = 'List<Object?> get props => ';
-        const props = this.parameters.expressionsOf('name');
-        const expression = `${getter}[${props.join(', ')}];`;
-
-        this.sb.writeln('@override', 1);
-
-        if (expression.length < 78) {
-            this.sb.writeln(expression, 1);
-        } else {
-            this.sb.writeln(`${getter}[`, 1);
-            this.sb.writeBlock(props, ',', 4);
-            this.sb.writeln('];', 3);
-        }
     }
 
     private writeClassEnd() {

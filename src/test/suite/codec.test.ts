@@ -1,10 +1,10 @@
 import * as assert from 'assert';
 import { describe, it } from 'mocha';
-import { ParameterCodec } from '../../codecs/parameter-codec';
+import { DartParameterCodec } from '../../codecs/dart-parameter-codec';
 import { Parameter } from '../../models/parameter';
 
 suite('ParameterCodec Test Suite', () => {
-    const codec = new ParameterCodec();
+    const codec = new DartParameterCodec();
 
     describe('encode', () => {
         it('should read all modifiers', () => {
@@ -80,7 +80,7 @@ suite('ParameterCodec Test Suite', () => {
     });
 
     describe('decode', () => {
-        const codec = new ParameterCodec();
+        const codec = new DartParameterCodec();
         const param = new Parameter({ type: 'int', name: 'code' });
         const nullable = new Parameter({ type: 'int?', name: 'code', isNullable: true });
         const named = new Parameter({ type: 'int', name: 'code', isNamed: true, isOptional: true });

@@ -1,4 +1,4 @@
-import { ConstructorTemplate, GenericTypeTemplate, hasConstructor } from '.';
+import { GenericTypeTemplate, hasConstructor, SubclassTemplate } from '.';
 import {
     ClassDeclarations,
     ClassElement,
@@ -19,7 +19,7 @@ export class ClassDataTemplate implements ClassElement {
     readonly doc?: string;
     readonly generic: GenericTypeTemplate;
     readonly kind: ElementKind = ElementKind.class;
-    readonly constructors: ConstructorTemplate[] = [];
+    readonly constructors: SubclassTemplate[] = [];
     readonly fields: FieldElement[] = [];
     /** Enum members for faster access. */
     readonly enumMembers: string[] = [];
@@ -50,7 +50,7 @@ export class ClassDataTemplate implements ClassElement {
     }
 
     /** The all available `factory` constructors. */
-    get factories(): ConstructorTemplate[] {
+    get factories(): SubclassTemplate[] {
         return this.constructors.filter((e) => e.type === ConstructorTypes.factory);
     }
 
@@ -66,7 +66,7 @@ export class ClassDataTemplate implements ClassElement {
 
     /**
      * The class instance variables without a parameters type.
-     * To get full variables details use {@link instanceVariables}.
+     * To get full variables details use {@link instances}.
      */
     private get variables(): ParametersTemplate {
         const parameters = ParametersTemplate.from('');
@@ -92,14 +92,14 @@ export class ClassDataTemplate implements ClassElement {
      * The class instance variables with parameters type
      * are based on constructor's {@link formalParameters}.
      */
-    get instanceVariables(): ParametersTemplate {
+    get instances(): ParametersTemplate {
         const parameters: Parameter[] = [];
         const formalPrameters = this.formalPrameters;
         // Instance variables with unknown initiated param type.
-        const instanceVariables = this.variables;
-        if (formalPrameters.isEmpty) return instanceVariables;
+        const instances = this.variables;
+        if (formalPrameters.isEmpty) return instances;
         // Combine the missing details from the formal parameters.
-        const merged = instanceVariables.included(...formalPrameters.all);
+        const merged = instances.included(...formalPrameters.all);
 
         // Sort by constructor parameters, it is important for other constructors.
         for (const variable of merged.all) {
@@ -115,10 +115,10 @@ export class ClassDataTemplate implements ClassElement {
         }
 
         // Update the buffer so that it matches the super constructor order.
-        return instanceVariables.replaceWith(...parameters);
+        return instances.replaceWith(...parameters);
     }
 
-    get generativeConstructor(): ConstructorTemplate | undefined {
+    get generativeConstructor(): SubclassTemplate | undefined {
         return this.constructors.filter((e) => e.type === ConstructorTypes.generative)[0];
     }
 
@@ -133,7 +133,7 @@ export class ClassDataTemplate implements ClassElement {
     }
 
     get hasData(): boolean {
-        return this.instanceVariables.isNotEmpty || this.factories.isNotEmpty();
+        return this.instances.isNotEmpty || this.factories.isNotEmpty();
     }
 
     get isAbstract(): boolean {
@@ -163,11 +163,11 @@ export class ClassDataTemplate implements ClassElement {
     }
 
     get hasImmutableVariables(): boolean {
-        return this.instanceVariables.all.every((e) => e.isFinal);
+        return this.instances.all.every((e) => e.isFinal);
     }
 
     // TODO: test variable.
-    get hasImplementations(): boolean {
+    get shouldImplement(): boolean {
         return !this.isAbstract && !this.hasPrivateConstructor && !this.isImmutableData;
     }
 
@@ -185,7 +185,7 @@ export class ClassDataTemplate implements ClassElement {
      * The element type.
      * @example 'Result<T>'
      */
-    get typeInference(): string {
+    get typeInterface(): string {
         return this.name + this.generic.type;
     }
 
@@ -193,7 +193,7 @@ export class ClassDataTemplate implements ClassElement {
         this.fields.push(field);
     }
 
-    addConstructor(constructor: ConstructorTemplate) {
+    addConstructor(constructor: SubclassTemplate) {
         this.constructors.push(constructor);
     }
 }

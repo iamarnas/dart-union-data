@@ -1,6 +1,6 @@
-import { ConstructorGenerator, CopyWithGenerator, MethodGenerator, SubclassGenerator, ToStringMethodGenerator } from '.';
+import { ConstructorGenerator, CopyWithGenerator, EqualityGenerator, MethodGenerator, SubclassGenerator, ToStringMethodGenerator } from '.';
 import { ConstructorTypes } from '../interface/element';
-import { ClassDataTemplate, ConstructorTemplate } from '../templates';
+import { ClassDataTemplate, SubclassTemplate } from '../templates';
 import '../types/string';
 import { StringBuffer } from '../utils/string-buffer';
 import { MapMethodGenerator } from './map-mehtod.generator';
@@ -145,6 +145,16 @@ export class DartCodeGenerator {
         return this;
     }
 
+    writeEquality(): this {
+        this.sb.write(new EqualityGenerator(this.element).generateEquality());
+        return this;
+    }
+
+    writeHashCode(): this {
+        this.sb.write(new EqualityGenerator(this.element).generateHashCode());
+        return this;
+    }
+
     generate(): string {
         return this.sb.toString();
     }
@@ -160,9 +170,9 @@ export class DartCodeGenerator {
         }
     }
 
-    private isChecker(e: ConstructorTemplate): string {
+    private isChecker(e: SubclassTemplate): string {
         const name = e.name.trimStart().capitalize();
-        return `bool get is${name} => this is ${e.typeInference};`;
+        return `bool get is${name} => this is ${e.typeInterface};`;
     }
 
     private writeAsChecker() {
@@ -172,9 +182,9 @@ export class DartCodeGenerator {
         }
     }
 
-    private asChecker(e: ConstructorTemplate): string {
+    private asChecker(e: SubclassTemplate): string {
         const name = e.name.trimStart().capitalize();
-        return `${e.typeInference} get as${name} => this as ${e.typeInference};`;
+        return `${e.typeInterface} get as${name} => this as ${e.typeInterface};`;
     }
 
     private writeAsOrNullChecker() {
@@ -183,14 +193,14 @@ export class DartCodeGenerator {
         }
     }
 
-    private asOrNullChecker(e: ConstructorTemplate) {
+    private asOrNullChecker(e: SubclassTemplate) {
         const name = e.name.trimStart().capitalize();
         const className = this.name.decapitalize();
 
         if (e.type === ConstructorTypes.factory) {
-            this.sb.write(`${e.typeInference} ? get as${name}OrNull {`, 1);
+            this.sb.write(`${e.typeInterface} ? get as${name}OrNull {`, 1);
             this.sb.writeln(`final ${className} = this;`, 2);
-            this.sb.writeln(`return ${className} is ${e.typeInference} ? ${className} : null;`, 2);
+            this.sb.writeln(`return ${className} is ${e.typeInterface} ? ${className} : null;`, 2);
             this.sb.writeln('}', 1);
         }
     }

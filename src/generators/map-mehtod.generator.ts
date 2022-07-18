@@ -3,7 +3,7 @@ import pubspec from '../shared/pubspec';
 import { DartListCollection } from '../syntax/dart-list-collection';
 import { DartMapCollection } from '../syntax/dart-map-collection';
 import { DartSetCollection } from '../syntax/dart-set-collection';
-import { ClassDataTemplate, ConstructorTemplate, ParametersTemplate } from '../templates';
+import { ClassDataTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
 import '../types/string';
 import { buildString, StringBuffer } from '../utils/string-buffer';
 
@@ -13,9 +13,9 @@ export class MapMethodGenerator {
     private readonly className: string;
     private sdkVersion = 2.12;
 
-    constructor(private readonly element: ClassDataTemplate | ConstructorTemplate) {
+    constructor(private readonly element: ClassDataTemplate | SubclassTemplate) {
         this.parameters = element instanceof ClassDataTemplate
-            ? element.instanceVariables
+            ? element.instances
             : element.parameters;
         this.sdkVersion = element instanceof ClassDataTemplate
             ? element.settings.sdkVersion

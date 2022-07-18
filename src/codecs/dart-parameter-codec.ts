@@ -19,7 +19,7 @@ export type ParameterExpression = 'this'
     | 'nullable'
     | 'super-params';
 
-export class ParameterCodec {
+export class DartParameterCodec {
     constructor() { }
 
     encode(input: string, type: ParameterType): Parameter {

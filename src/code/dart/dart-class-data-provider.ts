@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import { CodeValue, DartCodeProvider } from '.';
-import { DartCodeGenerator } from '../generators';
-import { ElementKind } from '../interface';
-import { ClassDataTemplate } from '../templates';
-import '../types/string';
-import { identicalCode } from '../utils';
+import { DartCodeGenerator, EqualityGenerator } from '../../generators';
+import { ElementKind } from '../../interface';
+import { ClassDataTemplate } from '../../templates';
+import '../../types/string';
+import { identicalCode } from '../../utils';
 
 export const UPDATE_COMMAND = 'update.class.data';
 export const GENERATE_COMMAND = 'generate.class.data';
@@ -17,6 +17,9 @@ export class DartClassDataProvider {
     readonly toMap: ToMapCode;
     readonly fromJson: FromJsonCode;
     readonly toJson: ToJsonCode;
+    readonly hashCode: HashCode;
+    readonly equality: EqualityCode;
+    readonly equatable: EquatableCode;
 
     constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
         if (element.kind !== ElementKind.class) {
@@ -30,6 +33,9 @@ export class DartClassDataProvider {
         this.toMap = new ToMapCode(provider, element);
         this.fromJson = new FromJsonCode(provider, element);
         this.toJson = new ToJsonCode(provider, element);
+        this.hashCode = new HashCode(provider, element);
+        this.equality = new EqualityCode(provider, element);
+        this.equatable = new EquatableCode(provider, element);
 
         // Update the position to insert `fromJson` below the `fromMap`.
         if (this.fromMap.range !== undefined) {
@@ -57,7 +63,7 @@ export class DartClassDataProvider {
     }
 
     get hasVariables(): boolean {
-        return this.element.instanceVariables.isNotEmpty;
+        return this.element.instances.isNotEmpty;
     }
 
     get hasFactories(): boolean {
@@ -65,13 +71,22 @@ export class DartClassDataProvider {
     }
 
     get values() {
-        return [
+        const values: CodeValue[] = [
             this.constructorCode,
             this.toString,
             this.fromMap,
             this.toMap,
-            this.fromJson
+            this.fromJson,
         ];
+
+        if (this.element.settings.equatable) {
+            values.push(this.equatable);
+            return values;
+        }
+
+        values.push(this.equality);
+        values.push(this.hashCode);
+        return values;
     }
 
     get hasChanges(): boolean {
@@ -87,11 +102,12 @@ export class DartClassDataProvider {
      * The `vscode.CodeAction` command to update all members of the class.
      * @returns `vscode.CodeAction`.
      */
-    updateCommand(): vscode.CodeAction {
+    updateCommand(...args: any[]): vscode.CodeAction {
         return this.provider.command({
             command: UPDATE_COMMAND,
             title: 'Update All Changes',
             tooltip: 'This will update all members of the class',
+            arguments: args,
         });
     }
 
@@ -99,11 +115,12 @@ export class DartClassDataProvider {
      * The `vscode.CodeAction` command to generate all members of the class.
      * @returns `vscode.CodeAction`.
      */
-    generateCommand(): vscode.CodeAction {
+    generateCommand(...args: any[]): vscode.CodeAction {
         return this.provider.command({
             command: GENERATE_COMMAND,
             title: 'Generate Class Data',
             tooltip: 'This will generate all members of the class',
+            arguments: args,
         });
     }
 
@@ -242,7 +259,10 @@ class FromMapCode implements CodeValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+        return this.provider.whereCodeFirstLine(
+            (line) => line.text.includesAll('fromMap(', 'Map<String, dynamic>'),
+            this.provider.codeLines,
+        );
     }
 
     fix(): vscode.CodeAction {
@@ -285,7 +305,10 @@ class ToMapCode implements CodeValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+        return this.provider.whereCodeFirstLine(
+            (line) => line.text.includesAll('Map<String, dynamic> ', ' toMap() ',),
+            this.provider.codeLines,
+        );
     }
 
     fix(): vscode.CodeAction {
@@ -307,7 +330,7 @@ class FromJsonCode implements CodeValue {
 
     constructor(
         private provider: DartCodeProvider,
-        element: ClassDataTemplate,
+        private element: ClassDataTemplate,
         position?: vscode.Position,
     ) {
         this.value = new DartCodeGenerator(element).writeFromJson().generate();
@@ -352,7 +375,7 @@ class ToJsonCode implements CodeValue {
 
     constructor(
         private provider: DartCodeProvider,
-        element: ClassDataTemplate,
+        private element: ClassDataTemplate,
         position?: vscode.Position,
     ) {
         this.value = new DartCodeGenerator(element).writeToJson().generate();
@@ -382,6 +405,163 @@ class ToJsonCode implements CodeValue {
         return this.provider.insertFix(
             this.position,
             'Generate to JSON Codecs',
+            this.replacement,
+        );
+    }
+
+    update() {
+        this.provider.replace(this);
+    }
+}
+
+class EqualityCode implements CodeValue {
+    value: string;
+    position: vscode.Position;
+
+    constructor(
+        private provider: DartCodeProvider,
+        private element: ClassDataTemplate,
+        position?: vscode.Position,
+    ) {
+        this.value = new EqualityGenerator(element).generateEquality();
+        this.position = position ?? provider.endPositionWithinCode();
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get range(): vscode.Range | undefined {
+        return this.provider.findCodeRange('bool operator ==(', this.provider.codeLines);
+    }
+
+    get replacement(): string {
+        return '\n\t@override\n' + this.value + '\n';
+    }
+
+    get isUpdated(): boolean {
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate Equality Operator',
+            this.replacement,
+        );
+    }
+
+    update() {
+        this.provider.replace(this);
+    }
+}
+
+class HashCode implements CodeValue {
+    value: string;
+    position: vscode.Position;
+
+    constructor(
+        private provider: DartCodeProvider,
+        private element: ClassDataTemplate,
+        position?: vscode.Position,
+    ) {
+        this.value = new EqualityGenerator(element).generateHashCode();
+        this.position = position ?? provider.endPositionWithinCode();
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get range(): vscode.Range | undefined {
+        const lines: vscode.TextLine[] = [];
+        const startLine = this.provider.whereTextLine(['int get hashCode => '], this.provider.codeLines)[0];
+
+        if (!startLine) return;
+
+        for (let i = startLine.lineNumber; i < this.provider.document.lineCount; i++) {
+            const line = this.provider.lineAt(i);
+            lines.push(line);
+            if (line.text.trimEnd().endsWith(';')) break;
+        }
+
+        return this.provider.rangeFromTextLines(...lines);
+    }
+
+    get replacement(): string {
+        return '\n\t@override\n' + this.value + '\n';
+    }
+
+    get isUpdated(): boolean {
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate HashCode',
+            this.replacement,
+        );
+    }
+
+    update() {
+        this.provider.replace(this);
+    }
+}
+
+class EquatableCode implements CodeValue {
+    value: string;
+    position: vscode.Position;
+
+    constructor(
+        private provider: DartCodeProvider,
+        private element: ClassDataTemplate,
+        position?: vscode.Position,
+    ) {
+        this.value = new EqualityGenerator(element).generateEquatable();
+        this.position = position ?? provider.endPositionWithinCode();
+    }
+
+    get isGenerated(): boolean {
+        return this.range !== undefined;
+    }
+
+    get range(): vscode.Range | undefined {
+        const lines: vscode.TextLine[] = [];
+        const startLine = this.provider.whereTextLine(['List<Object?> get props => '], this.provider.codeLines)[0];
+
+        if (!startLine) return;
+
+        for (let i = startLine.lineNumber; i < this.provider.codeLines.length; i++) {
+            const line = this.provider.codeLines[i];
+            lines.push(line);
+            if (line.text.trimEnd().endsWith(';')) break;
+        }
+
+        return this.provider.rangeFromTextLines(...lines);
+    }
+
+    get replacement(): string {
+        return '\n\t@override\n' + this.value + '\n';
+    }
+
+    get isUpdated(): boolean {
+        return identicalCode(
+            this.value,
+            this.provider.getTextFromCode(this.range),
+        );
+    }
+
+    fix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.position,
+            'Generate Equatable Equality',
             this.replacement,
         );
     }

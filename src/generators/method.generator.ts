@@ -1,12 +1,12 @@
 import { FieldElement } from '../interface';
-import { ClassDataTemplate, ConstructorTemplate } from '../templates';
+import { ClassDataTemplate, SubclassTemplate } from '../templates';
 import { buildString, StringBuffer } from '../utils/string-buffer';
 
 type MethodType = 'when' | 'maybeWhen' | 'whenOrNull' | 'map' | 'maybeMap' | 'mapOrNull';
 
 export class MethodGenerator {
     private readonly fields: FieldElement[];
-    private readonly factories: ConstructorTemplate[];
+    private readonly factories: SubclassTemplate[];
     private readonly name: string;
     private readonly superclass: string;
     private sb: StringBuffer = new StringBuffer();
@@ -80,7 +80,7 @@ export class MethodGenerator {
                 func({
                     name: 'R? mapOrNull<R>',
                     fields: this.factories,
-                    parameter: (field) => `R Function(${field.typeInference} ${field.name})? ${field.name},`,
+                    parameter: (field) => `R Function(${field.typeInterface} ${field.name})? ${field.name},`,
                 }),
             );
         }
@@ -104,7 +104,7 @@ export class MethodGenerator {
                 func({
                     name: 'R? maybeMap<R>',
                     fields: this.factories,
-                    parameter: (field) => `R Function(${field.typeInference} ${field.name})? ${field.name},`,
+                    parameter: (field) => `R Function(${field.typeInterface} ${field.name})? ${field.name},`,
                     default: 'required R Function() orElse,'
                 }),
             );
@@ -128,7 +128,7 @@ export class MethodGenerator {
                 func({
                     name: 'R? map<R>',
                     fields: this.factories,
-                    parameter: (field) => `required R Function(${field.typeInference} ${field.name}) ${field.name},`,
+                    parameter: (field) => `required R Function(${field.typeInterface} ${field.name}) ${field.name},`,
                 }),
             );
         }
@@ -223,7 +223,7 @@ export class MethodGenerator {
                 statement({
                     fields: this.factories,
                     statement: 'if',
-                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    parameter: (field) => `${this.superclass} is ${field.typeInterface}`,
                     callback: (field) => `return ${field.name}(${field.parametersFrom(this.superclass)});`,
                     default: 'throw AssertionError();',
                 }),
@@ -252,7 +252,7 @@ export class MethodGenerator {
                 statement({
                     fields: this.factories,
                     statement: 'if',
-                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    parameter: (field) => `${this.superclass} is ${field.typeInterface}`,
                     callback: (field) => `return ${field.name}?.call(${field.parametersFrom(this.superclass)}) ?? orElse();`,
                     default: 'throw AssertionError();',
                 }),
@@ -280,7 +280,7 @@ export class MethodGenerator {
                 statement({
                     fields: this.factories,
                     statement: 'if',
-                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    parameter: (field) => `${this.superclass} is ${field.typeInterface}`,
                     callback: (field) => `return ${field.name}?.call(${field.parametersFrom(this.superclass)});`,
                     default: 'throw AssertionError();',
                 }),
@@ -308,7 +308,7 @@ export class MethodGenerator {
                 statement({
                     fields: this.factories,
                     statement: 'if',
-                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    parameter: (field) => `${this.superclass} is ${field.typeInterface}`,
                     callback: (field) => `return ${field.name}(${this.superclass});`,
                     default: 'throw AssertionError();',
                 }),
@@ -337,7 +337,7 @@ export class MethodGenerator {
                 statement({
                     fields: this.factories,
                     statement: 'if',
-                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    parameter: (field) => `${this.superclass} is ${field.typeInterface}`,
                     callback: (field) => `return ${field.name}?.call(${this.superclass}) ?? orElse();`,
                     default: 'throw AssertionError();',
                 }),
@@ -365,7 +365,7 @@ export class MethodGenerator {
                 statement({
                     fields: this.factories,
                     statement: 'if',
-                    parameter: (field) => `${this.superclass} is ${field.typeInference}`,
+                    parameter: (field) => `${this.superclass} is ${field.typeInterface}`,
                     callback: (field) => `return ${field.name}?.call(${this.superclass});`,
                     default: 'throw AssertionError();',
                 }),

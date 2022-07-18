@@ -1,5 +1,5 @@
 import { Parameter } from '../models/parameter';
-import { ClassDataTemplate, ConstructorTemplate, ParametersTemplate } from '../templates';
+import { ClassDataTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
 import '../types/string';
 import { buildString, StringBuffer } from '../utils/string-buffer';
 
@@ -11,15 +11,15 @@ export class ConstructorGenerator {
     private isInitial = false;
 
     constructor(
-        private readonly element: ConstructorTemplate | ClassDataTemplate,
+        private readonly element: SubclassTemplate | ClassDataTemplate,
         private readonly className: string,
     ) {
-        if (element instanceof ConstructorTemplate) {
+        if (element instanceof SubclassTemplate) {
             this.sdkVersion = element.superclass.settings.sdkVersion;
             this.parameters = element.parameters;
         } else {
             this.sdkVersion = element.settings.sdkVersion;
-            this.parameters = element.instanceVariables.asOptionalNamed();
+            this.parameters = element.instances.asOptionalNamed();
         }
     }
 
@@ -66,14 +66,14 @@ export class ConstructorGenerator {
     }
 
     private get isPrivate(): boolean {
-        return this.element instanceof ConstructorTemplate
+        return this.element instanceof SubclassTemplate
             ? this.element.superclass.hasPrivateConstructor
             : false;
     }
 
     private constant(): string {
         const isConst = this.parameters.all.every((e) => e.isFinal);
-        return this.element instanceof ConstructorTemplate
+        return this.element instanceof SubclassTemplate
             ? this.element.isConst || this.element.superclass.isImmutableData ? 'const ' : ''
             : isConst ? 'const ' : '';
     }
@@ -161,7 +161,7 @@ export class ConstructorGenerator {
 
     private superConstructor(): string {
         const hasOnlyNamedParams = this.parameters.superParameters.every((e) => e.isNamed);
-        const constr = this.element instanceof ConstructorTemplate
+        const constr = this.element instanceof SubclassTemplate
             ? this.element.superclass.generativeConstructor
             : undefined;
         // Super parameters are only allowed with named parameters
