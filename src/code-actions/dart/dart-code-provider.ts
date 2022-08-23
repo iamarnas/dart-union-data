@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { DartClassDataProvider, DartEnumDataProvider } from '.';
 import { ElementBuilder, ElementKind } from '../../interface';
+import { CodeActionValueDelete, CodeActionValueInsert, CodeActionValueReplace } from '../../interface/action';
 import { ClassDataTemplate } from '../../templates';
 import { regexp } from '../../utils';
 import { CodeReader } from '../code-reader';
@@ -16,14 +17,14 @@ export class DartCodeProvider extends CodeReader {
     readonly selection: vscode.TextLine;
 
     /**
-     * The end position of the code.
+     * The end position of the code or end position of the document if the code is not found.
      */
     readonly end: vscode.Position;
 
     constructor(public document: vscode.TextDocument, selection: vscode.Range) {
         super(document);
         this.selection = document.lineAt(selection.start.line);
-        this.end = this.range?.end ?? selection.end;
+        this.end = this.range?.end ?? document.lineAt(document.lineCount - 1).range.end;
     }
 
     get element(): ClassDataTemplate | undefined {
@@ -43,6 +44,13 @@ export class DartCodeProvider extends CodeReader {
     }
 
     /**
+     * The end of the line position.
+     */
+    get eol(): vscode.Position {
+        return this.document.lineAt(this.document.lineCount - 1).range.end;
+    }
+
+    /**
      * The position of the first line of code.
      * @returns first line position.
      */
@@ -51,7 +59,7 @@ export class DartCodeProvider extends CodeReader {
     }
 
     /** 
-     * The code range where the current {@link selection} is.
+     * The selected code (Class) range where the current {@link selection} is.
      */
     get range(): vscode.Range | undefined {
         return this.detectCodeRange(this.selection.range.start, regexp.classMatch);
@@ -66,14 +74,14 @@ export class DartCodeProvider extends CodeReader {
      */
     getTextFromCode(range?: vscode.Range | undefined): string {
         const lines = this.codeLines.filter((l) => range && range.contains(l.range));
-        return this.doc.getText(this.rangeFromTextLines(...lines));
+        return this.doc.getText(this.linesToRange(...lines));
     }
 
     /**
      * The text lines of the current code from {@link range}.
      */
     get codeLines(): vscode.TextLine[] {
-        return this.textLinesFromRange(this.range);
+        return this.rangeToLines(this.range);
     }
 
     /**
@@ -81,6 +89,10 @@ export class DartCodeProvider extends CodeReader {
      */
     get text(): string {
         return this.doc.getText(this.range);
+    }
+
+    get editor(): vscode.TextEditor | undefined {
+        return vscode.window.activeTextEditor;
     }
 
     /**
@@ -106,8 +118,32 @@ export class DartCodeProvider extends CodeReader {
      * The expected position is before the last character `}`.
      * @returns end position inside the code.
      */
-    endPositionWithinCode() {
-        return new vscode.Position(this.end.line, this.end.character - 1);
+    withinCode() {
+        return this.end.with({ character: this.end.character - 1 });
+    }
+
+    /**
+     * The range between last map item and last enclosed bracket `)`.
+     * @param code An range of the `Map` method.
+     * @returns An range inside the method.
+     */
+    withinMap(code: vscode.Range): vscode.Range {
+        const lines = this.rangeToLines(code);
+        const callback = this.whereCodeFirstLine((line) => line.text.includesOne('=>', 'return'), lines);
+        const body = code.with(callback?.start, callback?.end);
+        const line = lines.find((e) => e.text.indexOf('};') !== -1 || e.text.indexOf(');') !== -1);
+        const lastLine = line ?? this.lineAt(body.end.line);
+        const character = lastLine.text.indexOf(';') - 1;
+        const end = lastLine.range.start.with({ character: character });
+        const isOneLineMethod = this.lineAt(body.start.line).text.trimEnd().endsWith(';');
+        const start = isOneLineMethod
+            ? end
+            : lastLine.range.start.with(
+                lastLine.lineNumber - 1,
+                this.lineAt(lastLine.lineNumber - 1).range.end.character,
+            );
+
+        return lastLine.range.with(start, end);
     }
 
     insertFix(
@@ -140,50 +176,34 @@ export class DartCodeProvider extends CodeReader {
         return action;
     }
 
-    get editor(): vscode.TextEditor | undefined {
-        return vscode.window.activeTextEditor;
-    }
-
-    replace(...values: Array<Pick<CodeValue, 'range' | 'value'>>) {
+    replace(...values: CodeActionValueReplace[]) {
         if (!this.editor) return;
         this.editor.edit((editBuilder) => {
             for (const element of values) {
-                if (element.range) {
+                if (element.range !== undefined) {
                     editBuilder.replace(element.range, element.value);
                 }
             }
         });
     }
 
-    insert(...values: Array<Pick<CodeValue, 'position' | 'replacement'>>) {
+    insert(...values: CodeActionValueInsert[]) {
         if (!this.editor) return;
         this.editor.edit((editBuilder) => {
             for (const element of values) {
-                editBuilder.insert(element.position, element.replacement);
+                editBuilder.insert(element.position, element.insertion);
             }
         });
     }
 
-    replaceWithEmpty(range: vscode.Range): vscode.Range | undefined {
-        if (range !== undefined) {
-            // const start = new vscode.Position(
-            //     range.start.line - 1,
-            //     this.lineAt(range.start.line - 1).range.end.character,
-            // );
-            const start = this.lineAt(range.start.line - 1).range.end;
-            const end = new vscode.Position(range.end.line, range.end.character);
-            return new vscode.Range(start, end);
-        }
+    delete(...values: CodeActionValueDelete[]) {
+        if (!this.editor) return;
+        this.editor.edit((editBuilder) => {
+            for (const element of values) {
+                if (element.range !== undefined) {
+                    editBuilder.delete(element.range);
+                }
+            }
+        });
     }
-}
-
-export interface CodeValue {
-    value: string,
-    replacement: string,
-    position: vscode.Position,
-    isGenerated: boolean,
-    isUpdated: boolean,
-    range: vscode.Range | undefined;
-    fix(): vscode.CodeAction
-    update(): void,
 }

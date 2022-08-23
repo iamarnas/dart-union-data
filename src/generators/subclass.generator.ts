@@ -1,10 +1,8 @@
-import { EqualityGenerator, ToStringMethodGenerator } from '.';
 import { ParameterExpression } from '../codecs/dart-parameter-codec';
 import { Settings } from '../models/settings';
 import { isDebugMode } from '../shared/constants';
 import { GenericTypeTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
 import { StringBuffer } from '../utils/string-buffer';
-import { ConstructorGenerator } from './constructor.generator';
 
 export class SubclassGenerator {
     private readonly subclass: string;
@@ -17,8 +15,8 @@ export class SubclassGenerator {
         private readonly element: SubclassTemplate,
         readonly className: string,
     ) {
-        this.subclass = element.subclassName;
-        this.generic = element.superclass.generic;
+        this.subclass = element.name;
+        this.generic = element.generic;
         this.parameters = this.element.parameters;
         this.settings = this.element.superclass.settings;
 
@@ -29,7 +27,7 @@ export class SubclassGenerator {
 
     generate(): string {
         this.writeClassTop();
-        this.writeConstructor();
+        // this.writeConstructor();
         this.sb.writeln();
         this.writeVariables();
         if (this.parameters.isNotEmpty) {
@@ -37,7 +35,7 @@ export class SubclassGenerator {
             this.writeCopyWithMethod();
         }
         this.sb.writeln();
-        this.writeToString();
+        // this.writeToString();
         this.sb.writeln();
         this.writeEqualityOperator();
         this.writeClassEnd();
@@ -45,7 +43,7 @@ export class SubclassGenerator {
     }
 
     private writeEqualityOperator() {
-        this.sb.writeln(new EqualityGenerator(this.element).generateEquality());
+        //this.sb.writeln(new EqualityGenerator(this.element).generateEquality());
     }
 
     /**
@@ -67,13 +65,13 @@ export class SubclassGenerator {
         const ex = 'extends'; //this.element.superclass.isImmutableData ? 'extends' : 'implements';
         const subclass = `${this.subclass}${this.generic.displayType}`;
         const superClass = `${this.className}${this.generic.type}`;
-        const equatableMixin = !this.settings.equatable ? '' : 'with EquatableMixin ';
+        const equatableMixin = !this.settings.useEquatable ? '' : 'with EquatableMixin ';
         this.sb.write(`class ${subclass} ${ex} ${superClass} ${equatableMixin}{`);
     }
 
-    private writeConstructor() {
-        this.sb.writeln(this.classConstructor(), 1);
-    }
+    // private writeConstructor() {
+    //     this.sb.writeln(this.classConstructor(), 1);
+    // }
 
     private writeVariables() {
         if (this.parameters.isEmpty) return;
@@ -84,12 +82,12 @@ export class SubclassGenerator {
         }
     }
 
-    private writeToString() {
-        return new ToStringMethodGenerator(this.element)
-            .asOverridable()
-            .writeCode()
-            .generate();
-    }
+    // private writeToString() {
+    //     return new ToStringMethodGenerator(this.element)
+    //         .asOverridable()
+    //         .writeCode()
+    //         .generate();
+    // }
 
     private writeClassEnd() {
         this.sb.writeln('}\n');
@@ -100,14 +98,14 @@ export class SubclassGenerator {
         this.sb.writeln(`${type} get copyWith => _${this.subclass}CopyWith(this);`, 1);
     }
 
-    private classConstructor(): string {
-        const constr = new ConstructorGenerator(this.element, this.subclass);
-        const expressionBody = constr.writeConstructor().generate();
+    // private classConstructor(): string {
+    //     const constr = new ConstructorGenerator(this.element, this.subclass);
+    //     const expressionBody = constr.writeConstructor().generate();
 
-        if (expressionBody.length < 78) {
-            return expressionBody;
-        }
+    //     if (expressionBody.length < 78) {
+    //         return expressionBody;
+    //     }
 
-        return constr.asBlock().writeConstructor().generate();;
-    }
+    //     return constr.asBlock().writeConstructor().generate();;
+    // }
 }

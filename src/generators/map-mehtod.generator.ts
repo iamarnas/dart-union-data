@@ -8,7 +8,7 @@ import '../types/string';
 import { buildString, StringBuffer } from '../utils/string-buffer';
 
 export class MapMethodGenerator {
-    private readonly sb = new StringBuffer();
+    private sb = new StringBuffer();
     private readonly parameters: ParametersTemplate;
     private readonly className: string;
     private sdkVersion = 2.12;
@@ -23,13 +23,20 @@ export class MapMethodGenerator {
         this.className = element.name;
     }
 
+    /**
+     * The generated map item.
+     */
+    get fromMapItems(): string[] {
+        return this.parameters.all.map((e) => this.fromMapItem(e));
+    }
+
+    get toMapItems(): string[] {
+        return this.parameters.all.map((e) => this.toMapItem(e));
+    }
+
     writeFromMap(): this {
         this.sb.write(`factory ${this.className}.fromMap(Map<String, dynamic> map) => ${this.className}(`, 1);
-
-        for (const param of this.parameters.all) {
-            this.writeFromMapEntry(param);
-        }
-
+        this.sb.writeBlock(this.fromMapItems);
         this.sb.writeln(');', 3);
 
         return this;
@@ -37,12 +44,9 @@ export class MapMethodGenerator {
 
     writeToMap(): this {
         this.sb.write('Map<String, dynamic> toMap() => <String, dynamic>{', 1);
-
-        for (const param of this.parameters.all) {
-            this.writeToMapEntry(param);
-        }
-
+        this.sb.writeBlock(this.toMapItems);
         this.sb.writeln('};', 3);
+
         return this;
     }
 
@@ -74,93 +78,98 @@ export class MapMethodGenerator {
         return this.sb.toString();
     }
 
-    private writeFromMapEntry(param: Parameter) {
-        switch (param.identity) {
-            case 'DateTime':
-                this.sb.write(classElementFromMap(param));
-                break;
-            case 'unknown':
-                this.sb.write(classElementFromMap(param));
-                break;
-            case 'BigInt':
-                this.sb.write(classElementFromMap(param));
-                break;
-            case 'Uri':
-                this.sb.write(classElementFromMap(param));
-                break;
-            case 'enum':
-                this.sb.write(enumFromMap(param, this.sdkVersion));
-                break;
-            case 'double':
-                this.sb.writeln(`${param.name}: (map['${param.mapKey}'] as num).toDouble(),`, 4);
-                break;
-            case 'Set':
-                this.sb.write(dartSetCollectionFromMap(param));
-                break;
-            case 'Map':
-                this.sb.write(dartMapCollectionFromMap(param));
-                break;
-            case 'Object':
-                this.sb.writeln(`${param.name}: map['${param.mapKey}'],`, 4);
-                break;
-            case 'dynamic':
-                this.sb.writeln(`${param.name}: map['${param.mapKey}'],`, 4);
-                break;
-            case 'UnmodifiableListView':
-                this.sb.writeln(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
-                break;
-            case 'UnmodifiableSetView':
-                this.sb.writeln(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
-                break;
-            case 'UnmodifiableMapView':
-                this.sb.writeln(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
-                break;
-            default:
-                const nullable = param.hasDefault && !param.type.endsWith('?') ? '?' : '';
-                this.sb.writeln(`${param.name}: map['${param.mapKey}'] as ${param.type}${nullable}`, 4);
+    private fromMapItem(param: Parameter): string {
+        return buildString((sb) => {
+            switch (param.identity) {
+                case 'DateTime':
+                    sb.write(classElementFromMap(param));
+                    break;
+                case 'unknown':
+                    sb.write(classElementFromMap(param));
+                    break;
+                case 'BigInt':
+                    sb.write(classElementFromMap(param));
+                    break;
+                case 'Uri':
+                    sb.write(classElementFromMap(param));
+                    break;
+                case 'enum':
+                    sb.write(enumFromMap(param, this.sdkVersion));
+                    break;
+                case 'double':
+                    sb.write(`${param.name}: (map['${param.mapKey}'] as num).toDouble(),`, 4);
+                    break;
+                case 'Set':
+                    sb.write(dartSetCollectionFromMap(param));
+                    break;
+                case 'Map':
+                    sb.write(dartMapCollectionFromMap(param));
+                    break;
+                case 'Object':
+                    sb.write(`${param.name}: map['${param.mapKey}'],`, 4);
+                    break;
+                case 'dynamic':
+                    sb.write(`${param.name}: map['${param.mapKey}'],`, 4);
+                    break;
+                case 'UnmodifiableListView':
+                    sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
+                    break;
+                case 'UnmodifiableSetView':
+                    sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
+                    break;
+                case 'UnmodifiableMapView':
+                    sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
+                    break;
+                default:
+                    const nullable = param.hasDefault && !param.type.endsWith('?') ? '?' : '';
+                    sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type}${nullable}`, 4);
 
-                if (param.hasDefault) {
-                    this.sb.write(` ?? ${param.defaultValue}`);
-                }
+                    if (param.hasDefault) {
+                        sb.write(` ?? ${param.defaultValue}`);
+                    }
 
-                this.sb.write(',');
-        }
+                    sb.write(',');
+            }
+        });
     }
 
-    private writeToMapEntry(param: Parameter) {
+    private toMapItem(param: Parameter): string {
         const nullable = param.isNullable && !param.hasDefault && !param.isList ? '?' : '';
-        switch (param.identity) {
-            case 'DateTime':
-                this.sb.write(toMap(param, `${nullable}.toIso8601String()`), 4);
-                break;
-            case 'unknown':
-                if (param.isList) {
-                    this.sb.write(toMap(param, `${nullable}.toMap()`), 4);
-                    break;
-                }
 
-                this.sb.write(toMap(param, ''), 4);
-                break;
-            case 'BigInt':
-                this.sb.write(toMap(param, `${nullable}.toString()`), 4);
-                break;
-            case 'Uri':
-                this.sb.write(toMap(param, `${nullable}.toString()`), 4);
-                break;
-            case 'Set':
-                this.sb.write(toMap(param, `${nullable}.toList()`), 4);
-                break;
-            case 'enum':
-                if (pubspec.sdkVersion >= 2.14) {
-                    this.sb.write(toMap(param, `${nullable}.name`), 4);
+        return buildString((sb) => {
+            switch (param.identity) {
+                case 'DateTime':
+                    sb.write(toMap(param, `${nullable}.toIso8601String()`), 4);
                     break;
-                }
+                case 'unknown':
+                    if (param.isList) {
+                        sb.write(toMap(param, `${nullable}.toMap()`), 4);
+                        break;
+                    }
 
-                this.sb.write(toMap(param, `${nullable}.index`), 4);
-                break;
-            default:
-                this.sb.writeln(`'${param.name}': ${param.name},`, 4);
-        }
+                    sb.write(toMap(param, ''), 4);
+                    break;
+                case 'BigInt':
+                    sb.write(toMap(param, `${nullable}.toString()`), 4);
+                    break;
+                case 'Uri':
+                    sb.write(toMap(param, `${nullable}.toString()`), 4);
+                    break;
+                case 'Set':
+                    sb.write(toMap(param, `${nullable}.toList()`), 4);
+                    break;
+                case 'enum':
+                    if (pubspec.sdkVersion >= 2.14) {
+                        sb.write(toMap(param, `${nullable}.name`), 4);
+                        break;
+                    }
+
+                    sb.write(toMap(param, `${nullable}.index`), 4);
+                    break;
+                default:
+                    sb.write(`'${param.name}': ${param.name},`, 4);
+            }
+        });
     }
 }
 

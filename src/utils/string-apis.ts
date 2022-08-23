@@ -12,5 +12,9 @@ function identicalCode(a: string, b: string): boolean {
     return x === y;
 }
 
-export { zip, trim, identicalCode };
+function stringLine(text: string): string {
+    return text.split('\n').map(trim).join('');
+}
+
+export { zip, trim, identicalCode, stringLine };
 

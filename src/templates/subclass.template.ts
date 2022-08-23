@@ -1,13 +1,16 @@
-import { ClassDataTemplate, ParametersTemplate } from '.';
+import { ClassDataTemplate, GenericTypeTemplate, ParametersTemplate } from '.';
 import { ConstructorElement, ConstructorTypes } from '../interface';
+import { Settings } from '../models/settings';
 import '../types/string';
 import { regexp } from '../utils';
 
 export class SubclassTemplate implements ConstructorElement {
     type: ConstructorTypes = ConstructorTypes.generative;
-    name = '';
+    superName = '';
     displayName = '';
     parameters: ParametersTemplate;
+    settings: Settings;
+    generic: GenericTypeTemplate;
 
     constructor(
         readonly superclass: ClassDataTemplate,
@@ -15,10 +18,12 @@ export class SubclassTemplate implements ConstructorElement {
     ) {
         this.type = getConstructorType(source);
         this.displayName = getConstructorDisplayName(source);
-        this.name = getConstructorName(superclass.name, this.displayName);
+        this.superName = getConstructorName(superclass.name, this.displayName);
         this.parameters = ParametersTemplate.from(this.displayName)
             .included(...superclass.instances.all)
             .included(...superclass.getters.all);
+        this.settings = superclass.settings;
+        this.generic = superclass.generic;
     }
 
     get isConst(): boolean {
@@ -29,7 +34,7 @@ export class SubclassTemplate implements ConstructorElement {
         return isPrivate(this.source);
     }
 
-    get subclassName(): string {
+    get name(): string {
         const subclass = getSubclassName(this.source);
         if (!subclass) return '';
         return subclass;
@@ -40,7 +45,7 @@ export class SubclassTemplate implements ConstructorElement {
      * @example Result<T, E>
      */
     get typeInterface(): string {
-        return this.subclassName + this.superclass.generic.type;
+        return this.name + this.superclass.generic.type;
     }
 
     /**

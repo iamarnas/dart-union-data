@@ -1,79 +1,86 @@
-import { MethodGenerator } from '.';
-import { ElementKind, FieldElement } from '../interface';
+import { AdaptiveMethodGenerator } from '.';
+import { ActionValue, ElementKind, FieldElement } from '../interface';
 import { ClassDataTemplate } from '../templates';
 import '../types/string';
-import { StringBuffer } from '../utils/string-buffer';
+import { buildString } from '../utils/string-buffer';
 
 export class EnumDataGenerator {
-    private element: ClassDataTemplate;
     private name: string;
     private values: FieldElement[] = [];
-    private sb: StringBuffer = new StringBuffer();
 
-    constructor(element: ClassDataTemplate) {
+    constructor(private element: ClassDataTemplate) {
         if (element.kind !== ElementKind.enum) {
             console.error(SyntaxError('Error due to invalid element type'));
         }
 
-        this.element = element;
         this.name = element.name;
         this.values = element.fields;
     }
 
-    writeExtension(): this {
-        this.sb.write(this.extensionTitle);
-        this.sb.writeln();
-        this.writeCheckers();
-        this.sb.writeln();
-        this.sb.writeln();
-        this.writeMethods();
-        this.sb.writeln('}');
-        return this;
+    get extension(): ActionValue {
+        const value = buildString((sb) => {
+            sb.write(this.extensionTitle);
+            sb.writeln();
+            sb.writeBlock(this.checkers.map((e) => e.value), undefined, 1);
+            sb.writeln();
+            sb.writeln();
+            sb.writeBlock(this.methods.map((e) => e.value), undefined, 1);
+            sb.writeln('}');
+        });
+
+        return {
+            value: value,
+            insertion: '\n' + value + '\n',
+        };
     }
 
-    /** Generates inside the enhanced enum class or inside extension. */
-    writeMethods(): this {
-        this.sb.writeAll(this.methods, '\n\n');
-        return this;
-    }
-
-    /** Generates inside the enhanced enum class or inside extension. */
-    writeCheckers(): this {
-        this.sb.writeAll(this.checkers, '\n', 1);
-        return this;
-    }
-
-    generate(): string {
-        return this.sb.toString();
-    }
-
-    get methods() {
-        const methodGenerator = MethodGenerator.fromElement(this.element);
+    get methods(): ActionValue[] {
+        const methodGenerator = AdaptiveMethodGenerator.fromElement(this.element);
         return [
-            methodGenerator.generate('map'),
-            methodGenerator.generate('maybeMap'),
-            methodGenerator.generate('mapOrNull'),
-            methodGenerator.generate('when'),
-            methodGenerator.generate('maybeWhen'),
-            methodGenerator.generate('whenOrNull'),
+            methodGenerator.get('map'),
+            methodGenerator.get('maybeMap'),
+            methodGenerator.get('mapOrNull'),
+            methodGenerator.get('when'),
+            methodGenerator.get('maybeWhen'),
+            methodGenerator.get('whenOrNull'),
         ];
     }
 
+    /**
+     * @example
+     * 'extension ResultExtension on Result {'
+     */
     get extensionTitle(): string {
         return `extension ${this.name}Extension on ${this.name} {`;
     }
 
-    get checkers() {
-        return this.values.map((e) => this.checker(e));
+    get checkers(): ActionValue[] {
+        return this.values.map((e) => new EnumCheckerGenerator(e, this.name));
     }
 
+    /**
+     * The `enum` dynamic checker elements used to find the all checkers in the code.
+     */
     get checkerElements(): string[] {
-        return ['bool ', 'get ', `=> this == ${this.name}.`, ';'];
+        return ['bool ', 'get ', '=>', 'this ==', `${this.name}.`, ';'];
+    }
+}
+
+class EnumCheckerGenerator implements ActionValue {
+    constructor(private field: FieldElement, readonly className: string) { }
+
+    /**
+     * @example 
+     * // The enum checker.
+     * bool get isLoading => this == Result.loading;
+     */
+    get value(): string {
+        const name = !this.field.name ? this.field.element.name : this.field.name;
+        const value = name.trimStart().capitalize();
+        return `\tbool get is${value} => this == ${this.className}.${name};`;
     }
 
-    private checker(e: FieldElement): string {
-        const name = !e.name ? e.element.name : e.name;
-        const value = name.trimStart().capitalize();
-        return `bool get is${value} => this == ${this.name}.${name};`;
+    get insertion(): string {
+        return '\n' + this.value + '\n';
     }
 }

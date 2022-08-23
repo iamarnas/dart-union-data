@@ -1,5 +1,5 @@
 import { Parameter } from '../models/parameter';
-import { StringBuffer } from '../utils/string-buffer';
+import { buildString, StringBuffer } from '../utils/string-buffer';
 
 export class DartListCollection {
     private readonly sb = new StringBuffer();
@@ -57,35 +57,34 @@ export function toListLoop(option: {
     tabs?: number,
     mapEntry: () => string,
 }) {
-    const sb = new StringBuffer();
-    const len = option.param.type.split('<').filter((e) => e === 'List').length;
-    const nullCheck = option.param.isNullable
-        || option.param.isNullable && option.param.hasDefault
-        ? '?'
-        : '';
-    const tabs = !option.tabs ? 4 : option.tabs;
+    return buildString((sb) => {
+        const len = option.param.type.split('<').filter((e) => e === 'List').length;
+        const nullCheck = option.param.isNullable
+            || option.param.isNullable && option.param.hasDefault
+            ? '?'
+            : '';
+        const tabs = !option.tabs ? 4 : option.tabs;
 
-    for (let i = 0; i < len; i++) {
-        switch (i) {
-            case 1:
-                sb.writeln(`${nullCheck}.map((e) => (e as List<dynamic>)`, tabs + i * 2);
-                break;
-            default:
-                sb.writeln('.map((e) => (e as List<dynamic>)', tabs + i * 2);
+        for (let i = 0; i < len; i++) {
+            switch (i) {
+                case 1:
+                    sb.writeln(`${nullCheck}.map((e) => (e as List<dynamic>)`, tabs + i * 2);
+                    break;
+                default:
+                    sb.writeln('.map((e) => (e as List<dynamic>)', tabs + i * 2);
+            }
         }
-    }
 
-    sb.writeln(option.mapEntry());
+        sb.writeln(option.mapEntry());
 
-    for (let i = len; i > 0; i--) {
-        switch (i) {
-            case 1:
-                sb.writeln('.toList(),', tabs + i * 2);
-                break;
-            default:
-                sb.writeln('.toList())', tabs + i * 2);
+        for (let i = len; i > 0; i--) {
+            switch (i) {
+                case 1:
+                    sb.writeln('.toList(),', tabs + i * 2);
+                    break;
+                default:
+                    sb.writeln('.toList())', tabs + i * 2);
+            }
         }
-    }
-
-    return sb.toString();
+    });
 }

@@ -1,56 +1,40 @@
+import { ActionValue } from '../interface';
 import { ClassDataTemplate, GenericTypeTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
-import { StringBuffer } from '../utils/string-buffer';
+import { buildString } from '../utils/string-buffer';
 
 export class CopyWithGenerator {
-    private readonly implementationType: string;
+    method: CopyWithMethodGenerator;
+    getter: CopyWithGetterGenerator;
+    interface: CopyWithInterfaceGenerator;
+    implementation: CopyWithImplementationGenerator;
+
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
+        this.method = new CopyWithMethodGenerator(element);
+        this.getter = new CopyWithGetterGenerator(element);
+        this.interface = new CopyWithInterfaceGenerator(element);
+        this.implementation = new CopyWithImplementationGenerator(element);
+    }
+}
+
+class CopyWithMethodGenerator implements ActionValue {
     private readonly className: string;
     private readonly parameters: ParametersTemplate;
     private readonly generic: GenericTypeTemplate;
-    private sb: StringBuffer = new StringBuffer();
 
-    constructor(private readonly element: SubclassTemplate | ClassDataTemplate) {
-        this.implementationType = element.typeInterface;
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
         this.parameters = element instanceof ClassDataTemplate
             ? element.instances
             : element.parameters;
-        this.generic = element instanceof ClassDataTemplate
-            ? element.generic
-            : element.superclass.generic;
-        this.className = element instanceof ClassDataTemplate
-            ? element.name + 'CopyWith'
-            : element.subclassName + 'CopyWith';
+        this.generic = element.generic;
+        this.className = element.name;
     }
 
-    static fromElement(element: SubclassTemplate | ClassDataTemplate): CopyWithGenerator {
-        return new CopyWithGenerator(element);
+    get value(): string {
+        return this.method();
     }
 
-    generate(): string {
-        this.writeInterface();
-        this.sb.writeln();
-        this.writeImplementation();
-        return this.sb.toString();
-    }
-
-    generateCopyWithGetter(): string {
-        this.writeCopyWithGetter();
-        return this.sb.toString();
-    }
-
-    generateCopyWithMethod() {
-        const className = this.className.slice(0, -8);
-        this.sb.writeln(`${className} copyWith({`, 1);
-        this.sb.writeBlock(this.nullableParams, ',', 2);
-        this.sb.writeln('}) {', 1);
-        this.sb.writeln(`return ${className}(`, 2);
-        this.sb.writeBlock(this.callbacksParams, ',', 3);
-        this.sb.writeln(');', 2);
-        this.sb.writeln('}', 1);
-        return this.sb.toString();
-    }
-
-    private get requiredParams(): string[] {
-        return this.parameters.expressionsOf('func-required-params');
+    get insertion(): string {
+        return '\n' + this.value + '\n';
     }
 
     private get nullableParams(): string[] {
@@ -60,6 +44,103 @@ export class CopyWithGenerator {
     private get callbacksParams(): string[] {
         return this.parameters.expressionsOf('copy-with-callback');
     }
+
+    private method(): string {
+        const className = this.className + this.generic.type;
+        return buildString((sb) => {
+            sb.write(`${className} copyWith({`, 1);
+            sb.writeBlock(this.nullableParams, ',', 2);
+            sb.writeln('}) {', 1);
+            sb.writeln(`return ${className}(`, 2);
+            sb.writeBlock(this.callbacksParams, ',', 3);
+            sb.writeln(');', 2);
+            sb.writeln('}', 1);
+        });
+    }
+}
+
+class CopyWithGetterGenerator implements ActionValue {
+    private readonly className: string;
+    private readonly generic: GenericTypeTemplate;
+
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
+        this.generic = element.generic;
+        this.className = element.name + 'CopyWith';
+    }
+
+    /**
+     * @example UserCopyWith<T> get copyWith => _UserCopyWith(this);
+     */
+    get value(): string {
+        return `\t${this.className}${this.generic.type} get copyWith => _${this.className}(this);`;
+    }
+
+    get insertion(): string {
+        return '\n' + this.value + '\n';
+    }
+}
+
+class CopyWithInterfaceGenerator implements ActionValue {
+    private readonly implementationType: string;
+    private readonly className: string;
+    private readonly parameters: ParametersTemplate;
+    private readonly generic: GenericTypeTemplate;
+
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
+        this.implementationType = element.typeInterface;
+        this.parameters = element instanceof ClassDataTemplate
+            ? element.instances
+            : element.parameters;
+        this.generic = element.generic;
+        this.className = element.name + 'CopyWith';
+    }
+
+    get value(): string {
+        return this.interface();
+    }
+
+    get insertion(): string {
+        return '\n' + this.value + '\n';
+    }
+
+    private get requiredParams(): string[] {
+        return this.parameters.expressionsOf('func-required-params');
+    }
+
+    private interface() {
+        return buildString((sb) => {
+            sb.write(`abstract class ${this.className}${this.generic.displayType} {`);
+            sb.writeln(`${this.implementationType} call({`, 1);
+            sb.writeBlock(this.requiredParams, ',', 2);
+            sb.writeln('});', 1);
+            sb.writeln('}');
+        });
+    }
+}
+
+class CopyWithImplementationGenerator implements ActionValue {
+    private readonly implementationType: string;
+    private readonly className: string;
+    private readonly parameters: ParametersTemplate;
+    private readonly generic: GenericTypeTemplate;
+
+    constructor(private element: SubclassTemplate | ClassDataTemplate) {
+        this.implementationType = element.typeInterface;
+        this.parameters = element instanceof ClassDataTemplate
+            ? element.instances
+            : element.parameters;
+        this.generic = element.generic;
+        this.className = element.name + 'CopyWith';
+    }
+
+    get value(): string {
+        return this.implementation();
+    }
+
+    get insertion(): string {
+        return '\n' + this.value + '\n';
+    }
+
 
     private get undefinedParams(): string[] {
         return this.parameters.expressionsOf('undefined');
@@ -82,38 +163,26 @@ export class CopyWithGenerator {
         });
     }
 
-    private writeCopyWithGetter() {
-        this.sb.writeln(`${this.className}${this.generic.displayType} get copyWith => _${this.className}(this);`, 1);
-    }
-
-    private writeInterface() {
-        this.sb.writeln(`abstract class ${this.className}${this.generic.displayType} {`);
-        this.sb.writeln(`${this.implementationType} call({`, 1);
-        this.sb.writeBlock(this.requiredParams, ',', 2);
-        this.sb.writeln('});', 1);
-        this.sb.writeln('}');
-    }
-
-    private writeImplementation() {
-        const className = this.element instanceof SubclassTemplate
-            ? this.element.subclassName
-            : this.element.name;
-        this.sb.writeln(`class _${this.className}${this.generic.displayType}`);
-        this.sb.write(` extends ${this.className}${this.generic.type} {`);
-        this.sb.writeln('static const _undefined = Object();', 1);
-        this.sb.writeln();
-        this.sb.writeln(`final ${this.implementationType} value;`, 1);
-        this.sb.writeln();
-        this.sb.writeln(`_${this.className}(this.value);`, 1);
-        this.sb.writeln();
-        this.sb.writeln('@override', 1);
-        this.sb.writeln(`${this.implementationType} call({`, 1);
-        this.sb.writeBlock(this.undefinedParams, ',', 2);
-        this.sb.writeln('}) {', 1);
-        this.sb.writeln(`return ${className}(`, 2);
-        this.sb.writeBlock(this.copyWithCallbacks, ',', 3);
-        this.sb.writeln(');', 2);
-        this.sb.writeln('}', 1);
-        this.sb.writeln('}');
+    private implementation() {
+        const className = this.element.name;
+        return buildString((sb) => {
+            sb.write(`class _${this.className}${this.generic.displayType}`);
+            sb.write(` extends ${this.className}${this.generic.type} {`);
+            sb.writeln('static const _undefined = Object();', 1);
+            sb.writeln();
+            sb.writeln(`final ${this.implementationType} value;`, 1);
+            sb.writeln();
+            sb.writeln(`_${this.className}(this.value);`, 1);
+            sb.writeln();
+            sb.writeln('@override', 1);
+            sb.writeln(`${this.implementationType} call({`, 1);
+            sb.writeBlock(this.undefinedParams, ',', 2);
+            sb.writeln('}) {', 1);
+            sb.writeln(`return ${className}(`, 2);
+            sb.writeBlock(this.copyWithCallbacks, ',', 3);
+            sb.writeln(');', 2);
+            sb.writeln('}', 1);
+            sb.writeln('}');
+        });
     }
 }

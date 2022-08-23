@@ -1,4 +1,4 @@
-import { ConstructorGenerator, CopyWithGenerator, EqualityGenerator, MethodGenerator, SubclassGenerator, ToStringMethodGenerator } from '.';
+import { AdaptiveMethodGenerator, ToStringMethodGenerator } from '.';
 import { ConstructorTypes } from '../interface/element';
 import { ClassDataTemplate, SubclassTemplate } from '../templates';
 import '../types/string';
@@ -42,44 +42,6 @@ export class DartCodeGenerator {
         return this;
     }
 
-    writeSubclasses(): this {
-        for (const factory of this.element.factories) {
-            const subclass = new SubclassGenerator(factory, this.element.name).generate();
-            const coopyWith = new CopyWithGenerator(factory).generate();
-
-            this.sb.writeln();
-            this.sb.writeln(subclass);
-
-            if (factory.parameters.isNotEmpty) {
-                this.sb.writeln(coopyWith);
-            }
-        }
-
-        return this;
-    }
-
-    writeLocalCopyWith(): this {
-        const coopyWith = new CopyWithGenerator(this.element).generate();
-        this.sb.writeln(coopyWith);
-        return this;
-    }
-
-
-    writeCopyWith(): this {
-        for (const factory of this.element.factories) {
-            const coopyWith = new CopyWithGenerator(factory).generate();
-            this.sb.writeln(coopyWith);
-        }
-
-        return this;
-    }
-
-    writeCopyWithMethod(): this {
-        const generator = new CopyWithGenerator(this.element);
-        this.sb.write(generator.generateCopyWithMethod());
-        return this;
-    }
-
     writeFromMap(): this {
         const generator = new MapMethodGenerator(this.element);
         this.sb.write(generator.writeFromMap().generate());
@@ -111,47 +73,27 @@ export class DartCodeGenerator {
     }
 
     writeConstructor(): this {
-        const generator = new ConstructorGenerator(this.element, this.name).asInitial();
+        // const constr = new ConstructorGenerator(this.element, this.name).asInitial();
+        // const superConstr = new SuperConstructorGenerator(this.element);
+        // const len = constr.length + superConstr.length;
 
-        if (generator.lengthWithoutSuper < 78) {
-            this.sb.write(generator.writeConstructorWithoutSuper().generate());
-            return this;
-        }
+        // if (len < 78) {
+        //     this.sb.write(constr.value + superConstr.value);
+        //     return this;
+        // }
 
-        this.sb.write(generator.asBlock().writeConstructorWithoutSuper().generate());
+        // this.sb.write(constr.asBlock().value);
         return this;
     }
 
     writeMethods(): this {
-        const methodGenerator = MethodGenerator.fromElement(this.element);
+        const methodGenerator = AdaptiveMethodGenerator.fromElement(this.element);
         this.sb.writeln(methodGenerator.generate('map'));
         this.sb.writeln(methodGenerator.generate('maybeMap'));
         this.sb.writeln(methodGenerator.generate('mapOrNull'));
         this.sb.writeln(methodGenerator.generate('when'));
         this.sb.writeln(methodGenerator.generate('maybeWhen'));
         this.sb.writeln(methodGenerator.generate('whenOrNull'));
-        return this;
-    }
-
-    writeToString(option?: { overridable: boolean }): this {
-        const toStringGenerator = new ToStringMethodGenerator(this.element);
-
-        if (option?.overridable) {
-            this.sb.write(toStringGenerator.asOverridable().writeCode().generate());
-            return this;
-        }
-
-        this.sb.write(toStringGenerator.writeCode().generate());
-        return this;
-    }
-
-    writeEquality(): this {
-        this.sb.write(new EqualityGenerator(this.element).generateEquality());
-        return this;
-    }
-
-    writeHashCode(): this {
-        this.sb.write(new EqualityGenerator(this.element).generateHashCode());
         return this;
     }
 

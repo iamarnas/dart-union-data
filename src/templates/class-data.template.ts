@@ -65,10 +65,10 @@ export class ClassDataTemplate implements ClassElement {
     }
 
     /**
-     * The class instance variables without a parameters type.
-     * To get full variables details use {@link instances}.
+     * The uninitialized class instance variables.
+     * To get initialized variables use {@link instances}.
      */
-    private get variables(): ParametersTemplate {
+    get uninitializedVariables(): ParametersTemplate {
         const parameters = ParametersTemplate.from('');
         const params = this.fields
             .filter((e) => e.kind === ElementKind.instanceVariable || e.kind === ElementKind.enum)
@@ -80,7 +80,7 @@ export class ClassDataTemplate implements ClassElement {
     /** 
      * Get generative constructor formal parameters. 
      * A term of the form `this.id` can provide value without type
-     * but provide parameters types and default values.
+     * but provide parameters types, value names and default values.
      */
     private get formalPrameters(): ParametersTemplate {
         if (!this.generativeConstructor) return ParametersTemplate.from('');
@@ -96,7 +96,7 @@ export class ClassDataTemplate implements ClassElement {
         const parameters: Parameter[] = [];
         const formalPrameters = this.formalPrameters;
         // Instance variables with unknown initiated param type.
-        const instances = this.variables;
+        const instances = this.uninitializedVariables;
         if (formalPrameters.isEmpty) return instances;
         // Combine the missing details from the formal parameters.
         const merged = instances.included(...formalPrameters.all);

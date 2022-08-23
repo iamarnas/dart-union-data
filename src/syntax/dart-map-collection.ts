@@ -72,7 +72,7 @@ export class DartMapCollection {
 
     private writeAsMap() {
         const maybeNull = !this.entry.type.endsWith('?') && this.param.hasDefault ? '?' : '';
-        this.sb.writeln(`${this.param.name}: (map['${this.param.mapKey}'] as ${this.entry.type}${maybeNull})`, 4);
+        this.sb.write(`${this.param.name}: (map['${this.param.mapKey}'] as ${this.entry.type}${maybeNull})`, 4);
     }
 
     private writeAsListDynamic() {

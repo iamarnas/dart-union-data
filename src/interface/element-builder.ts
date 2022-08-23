@@ -25,7 +25,8 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
 
     const sttings = new Settings({
         sdkVersion: pubspec.sdkVersion,
-        equatable: split[0].includes(' Equatable'),
+        useEquatable: split[0].includes(' Equatable'),
+        useAccurateCopyWith: true,
     });
     const element = new ClassDataTemplate(split[0], sttings);
 
@@ -59,7 +60,10 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
         // Skip the unwanted fields...
         if (field.includesOne(...ignoredItems)) continue;
 
-        // Clear all allowed comments from the field.
+        /**
+         * The matches for all remarks as comments or annotations
+         * that were skipped using the {@link codeSplit code splitter}.
+         */
         const match = regexp.combine(
             regexp.enumComment,
             regexp.startOfComment,

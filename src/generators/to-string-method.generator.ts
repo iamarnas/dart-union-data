@@ -1,89 +1,62 @@
+import { ActionValue } from '../interface';
 import { ClassDataTemplate, GenericTypeTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
-import { StringBuffer } from '../utils/string-buffer';
+import { buildString } from '../utils';
 
-export class ToStringMethodGenerator {
-    private sb = new StringBuffer();
+export class ToStringMethodGenerator implements ActionValue {
     private parameters: ParametersTemplate;
     private generic: GenericTypeTemplate;
     private className: string;
-    private isOverridable = false;
 
-    constructor(private element: SubclassTemplate | ClassDataTemplate) {
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
         this.parameters = element instanceof SubclassTemplate
             ? element.parameters
             : element.instances;
-        this.generic = element instanceof SubclassTemplate
-            ? element.superclass.generic
-            : element.generic;
-        this.className = element instanceof SubclassTemplate
-            ? element.subclassName
-            : element.name;
+        this.generic = element.generic;
+        this.className = element.name;
     }
-
-    writeLineExpression(): this {
-        if (this.isOverridable) {
-            this.sb.write('@override', 1);
-            this.sb.writeln();
-        }
-
-        this.sb.write(this.expression, 1);
-        return this;
-    }
-
-    writeBlockExpression(): this {
-        if (this.isOverridable) {
-            this.sb.write('@override', 1);
-            this.sb.writeln();
-        }
-
-        this.sb.write('String toString() {', 1);
-        this.sb.writeln(`return ${this.value}`, 2);
-        this.sb.writeln('}', 1);
-        return this;
-    }
-
-    writeCode(): this {
-        this.writeMethod();
-        return this;
-    }
-
-    generate(): string {
-        return this.sb.toString();
-    }
-
-    asOverridable(): this {
-        this.isOverridable = true;
-        return this;
-    };
 
     get title(): string {
         return 'String toString()';
     }
 
-    /**
-     * @example 'String toString() => Result<$T>(value: $value, error: $error);'
-     */
-    get expression(): string {
-        return `${this.title} => ${this.value}`;
+    get value(): string {
+        return this.method();
     }
 
-    get isOneLine(): boolean {
-        return this.expression.length < 78;
+    get insertion(): string {
+        return '\n' + this.value + '\n';
     }
 
     /**
      * @example 'Result<$T>(value: $value, error: $error)';
      */
-    private get value(): string {
+    get callbackValue(): string {
         const params = this.parameters.expressionsOf('to-string').join(', ');
         return `'${this.className}${this.generic.typeString()}(${params})';`;
     }
 
-    private writeMethod() {
-        if (this.isOneLine) {
-            this.writeLineExpression();
-        } else {
-            this.writeBlockExpression();
-        }
+
+    private blockBody(): string {
+        return buildString((sb) => {
+            sb.write(`${this.title} {`, 1);
+            sb.writeln(`return ${this.callbackValue}`, 2);
+            sb.writeln('}', 1);
+        });
+    }
+
+    /**
+     * @example 'String toString() => Result<$T>(value: $value, error: $error);'
+     */
+    private lineBody(): string {
+        return `${this.title} => ${this.value}`;
+    }
+
+    private get isOneLine(): boolean {
+        return this.lineBody().length < 78;
+    }
+
+    private method(): string {
+        if (this.isOneLine) return this.lineBody();
+        return this.blockBody();
     }
 }

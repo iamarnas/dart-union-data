@@ -13,7 +13,7 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.
         token: vscode.CancellationToken,
     ): vscode.ProviderResult<Array<vscode.CodeAction | vscode.Command>> {
         const dartCodeActions = this.dartCodeActions(document, range);
-        return !dartCodeActions ? [] : dartCodeActions;
+        return dartCodeActions ?? [];
     }
 
     public static readonly providedCodeActionKinds = [
@@ -38,44 +38,35 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.
             console.log(enumCode);
 
             if (enumCode.isEmpty) return;
-            if (enumCode.extension.isUpdated) return;
+            if (enumCode.enum.extension.isUpdated) return;
 
-            if (element.isEnhancedEnum) {
-                if (!enumCode.extension.isGenerated && !enumCode.hasData) {
-                    actions.push(enumCode.extension.fix());
-                }
+            // if (element.isEnhancedEnum) {
+            //     if (!enumCode.enum.extension.isGenerated) {
+            //         actions.push(enumCode.enum.extension.fix());
+            //     }
 
-                if (enumCode.extension.isGenerated && !enumCode.extension.isUpdated) {
-                    actions.push(enumCode.updateCommand(enumCode));
-                    return actions;
-                }
+            //     if (enumCode.enum.extension.isGenerated && !enumCode.enum.extension.isUpdated) {
+            //         actions.push(enumCode.updateCommand(enumCode));
+            //         return actions;
+            //     }
 
-                if (!enumCode.hasData && !enumCode.hasCheckers && !enumCode.hasMethods) {
-                    actions.push(enumCode.enumDataFix());
-                }
 
-                if (!enumCode.hasCheckers) {
-                    actions.push(enumCode.checkersFix());
-                }
+            //     if (enumCode.hasChanges) {
+            //         actions.push(enumCode.updateCommand(enumCode));
+            //     }
 
-                if (!enumCode.hasMethods) {
-                    actions.push(enumCode.methodsFix());
-                }
+            //     return actions;
+            // }
 
-                if (enumCode.hasChanges) {
-                    actions.push(enumCode.updateCommand(enumCode));
-                }
+            actions.push(...enumCode.actions);
 
-                return actions;
-            }
+            // if (enumCode.hasChanges) {
+            //     actions.push(enumCode.updateCommand(enumCode));
+            // }
 
-            if (enumCode.hasChanges) {
-                actions.push(enumCode.updateCommand(enumCode));
-            }
-
-            if (!enumCode.extension.isGenerated) {
-                actions.push(enumCode.extension.fix());
-            }
+            // if (!enumCode.enum.extension.isGenerated) {
+            //     actions.push(enumCode.enum.extension.fix());
+            // }
 
             return actions;
         }
@@ -111,12 +102,20 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.
                 actions.push(dartCode.toMap.fix());
             }
 
+            if (!dartCode.copyWith.method.isGenerated) {
+                actions.push(dartCode.copyWith.method.fix());
+            }
+
             if (dartCode.toMap.isGenerated && !dartCode.toJson.isGenerated) {
                 actions.push(dartCode.toJson.fix());
             }
 
             if (dartCode.fromMap.isGenerated && !dartCode.fromJson.isGenerated) {
                 actions.push(dartCode.fromJson.fix());
+            }
+
+            if (!dartCode.equality.isGenerated) {
+                actions.push(dartCode.equality.fix());
             }
         }
 

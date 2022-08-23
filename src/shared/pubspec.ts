@@ -32,6 +32,10 @@ class Pubspec {
         return this.data.includes('equatable:');
     }
 
+    get hasCollection(): boolean {
+        return this.data.includes('collection:');
+    }
+
     get projectName(): string {
         const name = this.split.find((e) => e.startsWith('name: ')) ?? '';
         return name.slice('name: '.length).trim();
@@ -60,7 +64,7 @@ class Pubspec {
         const content = fm.readFileFromWorkspace('pubspec.yaml');
 
         if (!content) {
-            console.log('Failed to read pubspec.yaml file contents');
+            console.info('Failed to read pubspec.yaml file contents');
             return '';
         }
 

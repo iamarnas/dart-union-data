@@ -1,39 +1,162 @@
+import { ActionValue } from '../interface';
 import { Settings } from '../models/settings';
 import { ClassDataTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
-import { StringBuffer } from '../utils';
+import { buildString } from '../utils';
 
 export class EqualityGenerator {
+    readonly operator: EqualityOperatorGenerator;
+    readonly deepEquality: DeepCollectionOperatorGenerator;
+    readonly equatable: EquatableGenerator;
+    readonly hashCode: HashCodeGenerator;
+
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
+        this.operator = new EqualityOperatorGenerator(element);
+        this.deepEquality = new DeepCollectionOperatorGenerator(element);
+        this.equatable = new EquatableGenerator(element);
+        this.hashCode = new HashCodeGenerator(element);
+    }
+}
+
+class EqualityOperatorGenerator implements ActionValue {
     private readonly parameters: ParametersTemplate;
-    private readonly settings: Settings;
-    private sb: StringBuffer = new StringBuffer();
+    private typeInterface: string;
+
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
+        this.typeInterface = element.typeInterface;
+        this.parameters = element instanceof SubclassTemplate
+            ? element.parameters
+            : element.instances;
+    }
+
+    get value(): string {
+        return this.operator();
+    }
+
+    get insertion(): string {
+        return '\n' + this.value + '\n';
+    }
+
+    /**
+     * @example name == other.name
+     */
+    private get otherNames(): string[] {
+        return this.parameters.expressionsOf('equal-to-other');
+    }
+
+    private operator(): string {
+        const values = !this.otherNames.length
+            ? ';'
+            : ` && ${this.otherNames.join(' && ')};`;
+        const expression = `return other is ${this.typeInterface}${values}`;
+
+        return buildString((sb) => {
+            sb.write('bool operator ==(Object other) {', 1);
+            sb.writeln('if (runtimeType != other.runtimeType) return false;', 2);
+
+            if (expression.length < 76) {
+                sb.writeln(expression, 2);
+            } else {
+                // Block
+                sb.writeln(`return other is ${this.typeInterface} &&\n`, 2);
+                sb.writeAll(this.otherNames, ' &&\n', 4);
+                sb.write(';');
+            }
+
+            sb.writeln('}', 1);
+        });
+    }
+}
+
+class EquatableGenerator implements ActionValue {
+    private readonly parameters: ParametersTemplate;
 
     constructor(private readonly element: SubclassTemplate | ClassDataTemplate) {
         this.parameters = element instanceof SubclassTemplate
             ? element.parameters
             : element.instances;
-        this.settings = element instanceof SubclassTemplate
-            ? element.superclass.settings
-            : element.settings;
     }
 
-    generateEquality(): string {
-        if (this.settings.equatable) {
-            this.writeEquatableEquality();
-            return this.sb.toString();
-        }
-
-        this.writeEqualityOperator();
-        return this.sb.toString();
+    get value(): string {
+        return this.equality();
     }
 
-    generateEquatable(): string {
-        this.writeEquatableEquality();
-        return this.sb.toString();
+    get insertion(): string {
+        return '\n' + this.value + '\n';
     }
 
-    generateHashCode(): string {
-        this.writeHashCodeGetter();
-        return this.sb.toString();
+    /**
+     * Equatable props values.
+     */
+    get props(): string[] {
+        return this.parameters.expressionsOf('name');
+    }
+
+    /**
+     * @example 'List<Object?> get props => '
+     */
+    get getter(): string {
+        return 'List<Object?> get props => ';
+    }
+
+    private equality(): string {
+        const expression = `${this.getter}[${this.props.join(', ')}];`;
+
+        return buildString((sb) => {
+            if (expression.length < 78) {
+                sb.write(expression, 1);
+            } else {
+                sb.write(`${this.getter}[`, 1);
+                sb.writeBlock(this.props, ',', 4);
+                sb.writeln('];', 3);
+            }
+        });
+    }
+}
+
+class DeepCollectionOperatorGenerator implements ActionValue {
+    private readonly typeInterface: string;
+
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
+        this.typeInterface = element.typeInterface;
+    }
+
+    get value(): string {
+        return this.deepCollectionOperator();
+    }
+
+    get insertion(): string {
+        return '\n' + this.value + '\n';
+    }
+
+    private deepCollectionOperator(): string {
+        return buildString((sb) => {
+            sb.write('bool operator ==(Object other) {', 1);
+            sb.writeln('if (runtimeType != other.runtimeType) return false;', 2);
+            sb.writeln('final mapEquals = const DeepCollectionEquality().equals;', 2);
+            sb.writeln(`return other is ${this.typeInterface} && `, 2);
+            sb.write('mapEquals(toMap(), other.toMap());');
+            sb.writeln('}', 1);
+        });
+    }
+}
+
+class HashCodeGenerator implements ActionValue {
+    private readonly parameters: ParametersTemplate;
+    private readonly settings: Settings;
+
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
+        this.parameters = element instanceof SubclassTemplate
+            ? element.parameters
+            : element.instances;
+        this.settings = element.settings;
+    }
+
+    get value(): string {
+        return this.hashCodeValue();
+    }
+
+    get insertion(): string {
+        return '\n' + this.value + '\n';
     }
 
     /**
@@ -50,90 +173,57 @@ export class EqualityGenerator {
         return this.parameters.expressionsOf('hashCode');
     }
 
-    /**
-     * @example name == other.name
-     */
-    private get otherNames(): string[] {
-        return this.parameters.expressionsOf('equal-to-other');
+    get getter(): string {
+        return 'int get hashCode => ';
     }
 
-    private writeEqualityOperator() {
-        const values = !this.otherNames.length ? ';' : ` && ${this.otherNames.join(' && ')};`;
-        const expression = `return other is ${this.element.typeInterface}${values}`;
-
-        this.sb.write('bool operator ==(Object other) {', 1);
-        this.sb.writeln('if (runtimeType != other.runtimeType) return false;', 2);
-
-        if (expression.length < 76) {
-            this.sb.writeln(expression, 2);
-        } else {
-            // Block
-            this.sb.writeln(`return other is ${this.element.typeInterface} &&\n`, 2);
-            this.sb.writeAll(this.otherNames, ' &&\n', 4);
-            this.sb.write(';');
-        }
-
-        this.sb.writeln('}', 1);
-    }
-
-    private writeHashCodeGetter() {
+    private hashCodeValue(): string {
         if (this.settings.sdkVersion >= 2.14) {
-            this.writeHashCodeObject();
+            return this.hashCodeFromObject();
         } else {
-            this.writeHashCode();
+            return this.hashCode();
         }
     }
 
-    private writeHashCode() {
-        const getter = 'int get hashCode => ';
+    private hashCode(): string {
         const hashCodes = !this.hashCodes.length ? '0;' : `${this.hashCodes.join(' ^ ')};`;
-        const expression = `${getter}${hashCodes}`;
+        const expression = `${this.getter}${hashCodes}`;
 
-        if (expression.length < 78) {
-            this.sb.write(expression, 1);
-        } else {
-            // Block
-            this.sb.write(getter + '\n', 1);
-            this.sb.writeAll(this.hashCodes, ' ^\n', 3);
-            this.sb.write(';');
-        }
-    }
-
-    private writeHashCodeObject() {
-        const getter = 'int get hashCode => ';
-        const objects = !this.names.length ? '0;' : `${this.names.join(', ')}`;
-        const expression = `${getter}Object.hash(${objects});`;
-
-        // Object.hash() requires at least two values.
-        if (this.names.length > 1) {
+        return buildString((sb) => {
             if (expression.length < 78) {
-                this.sb.write(expression, 1);
+                sb.write(expression, 1);
             } else {
                 // Block
-                this.sb.write(`${getter}Object.hash(`, 1);
-                this.sb.writeBlock(this.names, ',', 4);
-                this.sb.writeln(');', 2);
+                sb.write(this.getter + '\n', 1);
+                sb.writeAll(this.hashCodes, ' ^\n', 3);
+                sb.write(';');
             }
-        } else {
-            if (this.parameters.isEmpty) {
-                this.sb.write(`${getter}${objects}`, 1);
-                return;
-            }
-
-            this.sb.write(`${getter}${objects}.hashCode;`, 1);
-        }
+        });
     }
 
-    private writeEquatableEquality() {
-        const getter = 'List<Object?> get props => ';
-        const expression = `${getter}[${this.names.join(', ')}];`;
+    private hashCodeFromObject(): string {
+        const objects = !this.names.length ? '0;' : `${this.names.join(', ')}`;
+        const expression = `${this.getter}Object.hash(${objects});`;
 
-        if (expression.length < 78) {
-            this.sb.write(expression, 1);
-        } else {
-            this.sb.write(`${getter}[`, 1);
-            this.sb.writeBlock(this.names, ',', 4);
-            this.sb.writeln('];', 3);
-        }
+        return buildString((sb) => {
+            // Object.hash() requires at least two values.
+            if (this.names.length > 1) {
+                if (expression.length < 78) {
+                    sb.write(expression, 1);
+                } else {
+                    // Block
+                    sb.write(`${this.getter}Object.hash(`, 1);
+                    sb.writeBlock(this.names, ',', 4);
+                    sb.writeln(');', 2);
+                }
+            } else {
+                if (this.parameters.isEmpty) {
+                    sb.write(`${this.getter}${objects}`, 1);
+                    return;
+                }
+
+                sb.write(`${this.getter}${objects}.hashCode;`, 1);
+            }
+        });
     }
 }

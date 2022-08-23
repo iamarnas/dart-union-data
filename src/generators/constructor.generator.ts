@@ -1,54 +1,57 @@
+import { ActionValue } from '../interface';
 import { Parameter } from '../models/parameter';
 import { ClassDataTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
 import '../types/string';
-import { buildString, StringBuffer } from '../utils/string-buffer';
+import { buildString } from '../utils/string-buffer';
 
 export class ConstructorGenerator {
-    private readonly sb = new StringBuffer();
+    private readonly className: string;
+    private sdkVersion: number;
+    generative: GenerativeConstructorGenerator;
+    super: SuperConstructorGenerator;
+
+    constructor(element: SubclassTemplate | ClassDataTemplate) {
+        this.className = element.name;
+        this.sdkVersion = element.settings.sdkVersion;
+        this.generative = new GenerativeConstructorGenerator(element);
+        this.super = new SuperConstructorGenerator(element);
+    }
+}
+
+class GenerativeConstructorGenerator implements ActionValue {
+    readonly className: string;
     private parameters: ParametersTemplate;
     private sdkVersion: number;
     private isBlock = false;
     private isInitial = false;
 
-    constructor(
-        private readonly element: SubclassTemplate | ClassDataTemplate,
-        private readonly className: string,
-    ) {
+    constructor(private element: SubclassTemplate | ClassDataTemplate) {
+        this.className = element.name;
+        this.sdkVersion = element.settings.sdkVersion;
+
         if (element instanceof SubclassTemplate) {
-            this.sdkVersion = element.superclass.settings.sdkVersion;
             this.parameters = element.parameters;
         } else {
-            this.sdkVersion = element.settings.sdkVersion;
             this.parameters = element.instances.asOptionalNamed();
         }
     }
 
-    get lengthWithSuper(): number {
-        return this.constant().length
-            + this.className.length
-            + this.localParameters().length
-            + this.superConstructor().length;
+    get value(): string {
+        return buildString((sb) => {
+            sb.write(this.modifier());
+            sb.write(`${this.className}`);
+            sb.write(this.localParameters());
+        });
     }
 
-    get lengthWithoutSuper(): number {
-        return this.constant().length
+    get insertion(): string {
+        return '\n' + this.value + '\n';
+    }
+
+    get length(): number {
+        return this.modifier().length
             + this.className.length
             + this.localParameters().length;
-    }
-
-    writeConstructor(): this {
-        this.sb.write(this.constant());
-        this.sb.write(`${this.className}`);
-        this.sb.write(this.localParameters());
-        this.sb.write(`${this.superConstructor()}`);
-        return this;
-    }
-
-    writeConstructorWithoutSuper(): this {
-        this.sb.write(this.constant());
-        this.sb.write(`${this.className}`);
-        this.sb.write(this.localParameters() + ';');
-        return this;
     }
 
     asBlock(): this {
@@ -61,17 +64,13 @@ export class ConstructorGenerator {
         return this;
     }
 
-    generate(): string {
-        return this.sb.toString();
-    }
-
     private get isPrivate(): boolean {
         return this.element instanceof SubclassTemplate
             ? this.element.superclass.hasPrivateConstructor
             : false;
     }
 
-    private constant(): string {
+    private modifier(): string {
         const isConst = this.parameters.all.every((e) => e.isFinal);
         return this.element instanceof SubclassTemplate
             ? this.element.isConst || this.element.superclass.isImmutableData ? 'const ' : ''
@@ -158,8 +157,41 @@ export class ConstructorGenerator {
             return e.expression('this');
         });
     }
+}
 
-    private superConstructor(): string {
+class SuperConstructorGenerator implements ActionValue {
+    private parameters: ParametersTemplate;
+    private sdkVersion: number;
+
+    constructor(private readonly element: SubclassTemplate | ClassDataTemplate) {
+        if (element instanceof SubclassTemplate) {
+            this.parameters = element.parameters;
+        } else {
+            this.parameters = element.instances.asOptionalNamed();
+        }
+
+        this.sdkVersion = element.settings.sdkVersion;
+    }
+
+    get value(): string {
+        return this.generateConstructor();
+    }
+
+    get insertion(): string {
+        return this.value + '\n';
+    }
+
+    get length(): number {
+        return this.generateConstructor().length;
+    }
+
+    private get isPrivate(): boolean {
+        return this.element instanceof SubclassTemplate
+            ? this.element.superclass.hasPrivateConstructor
+            : false;
+    }
+
+    private generateConstructor(): string {
         const hasOnlyNamedParams = this.parameters.superParameters.every((e) => e.isNamed);
         const constr = this.element instanceof SubclassTemplate
             ? this.element.superclass.generativeConstructor
