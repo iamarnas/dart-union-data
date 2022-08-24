@@ -5,19 +5,97 @@ import { ActionValue, CodeActionValue } from '../../../interface';
 import { ClassDataTemplate } from '../../../templates';
 import { identicalCode } from '../../../utils';
 
-export class EnumCodeAction {
+export class EnumCodeActionData {
     readonly extension: EnumExtensionCodeAction;
     readonly checkers: EnumCheckerCodeAction[];
     readonly methods: EnumMethodCodeAction[];
+    private readonly checkerElements: string[] = [];
 
-    constructor(private provider: DartCodeProvider, element: ClassDataTemplate) {
+    constructor(private provider: DartCodeProvider, private element: ClassDataTemplate) {
         const generated = new EnumDataGenerator(element);
+        this.checkerElements = generated.checkerElements;
         this.extension = new EnumExtensionCodeAction(provider, generated.extension);
         this.checkers = generated.checkers.map((e) => new EnumCheckerCodeAction(provider, e));
         this.methods = generated.methods.map((e) => new EnumMethodCodeAction(provider, e));
     }
 
-    checkersFix(): vscode.CodeAction {
+    get items(): CodeActionValue[] {
+        if (!this.element.isEnhancedEnum) return [this.extension];
+        return [...this.checkers, ...this.methods, this.extension];
+    }
+
+    get hasChecker(): boolean {
+        return this.checkers.some((e) => e.isGenerated);
+    }
+
+    get hasMethod(): boolean {
+        return this.methods.some((e) => e.isGenerated);
+    }
+
+    get hasAnyData(): boolean {
+        return this.extension.isGenerated || this.hasChecker || this.hasMethod;
+    }
+
+    get actions(): vscode.CodeAction[] {
+        const actions: vscode.CodeAction[] = [];
+
+        if (!this.element.isEnhancedEnum) {
+            return actions.concat(this.extension.fix());
+        }
+
+        if (!this.hasChecker) {
+            actions.push(this.checkersFix());
+        }
+
+        if (!this.hasMethod) {
+            actions.push(this.methodsFix());
+        }
+
+        if (!this.hasAnyData) {
+            actions.push(this.dataFix());
+            actions.push(this.extension.fix());
+        }
+
+        return actions;
+    }
+
+    /**
+     * Items to need remove.
+     */
+    get removals(): vscode.TextLine[] {
+        return this.generatedCheckers.filter((line) => {
+            return !this.checkers.some((e) => e.range?.contains(line.range));
+        });
+    }
+
+    /**
+     * Items to need insert.
+     * Due to some items have no body and must be inserted instead of updating.
+     */
+    get insertions(): CodeActionValue[] {
+        return this.generatedCheckers.length === 0
+            ? []
+            : this.checkers.filter((e) => !e.isGenerated);
+    }
+
+    /**
+     * Items to need replace (update).
+     */
+    get replacements(): CodeActionValue[] {
+        return this.items.filter((e) => e.isGenerated && !e.isUpdated);
+    }
+
+    get hasChanges(): boolean {
+        return this.replacements.length !== 0
+            || this.insertions.length !== 0
+            || this.removals.length !== 0;
+    }
+
+    private get generatedCheckers(): vscode.TextLine[] {
+        return this.provider.whereTextLine(this.checkerElements, this.provider.codeLines);
+    }
+
+    private checkersFix(): vscode.CodeAction {
         return this.provider.insertFix(
             this.provider.withinCode(),
             'Generate Enum Checkers',
@@ -25,11 +103,20 @@ export class EnumCodeAction {
         );
     }
 
-    methodsFix(): vscode.CodeAction {
+    private methodsFix(): vscode.CodeAction {
         return this.provider.insertFix(
             this.provider.withinCode(),
             'Generate Enum Methods',
             this.methods.map((e) => e.insertion).join('')
+        );
+    }
+
+    private dataFix(): vscode.CodeAction {
+        return this.provider.insertFix(
+            this.provider.withinCode(),
+            'Generate Enum Data',
+            '\n' + this.checkers.map((e) => e.value).join('\n') + '\n'
+            + this.methods.map((e) => e.insertion).join('')
         );
     }
 }

@@ -87,13 +87,14 @@ export class DartCodeGenerator {
     }
 
     writeMethods(): this {
-        const methodGenerator = AdaptiveMethodGenerator.fromElement(this.element);
-        this.sb.writeln(methodGenerator.generate('map'));
-        this.sb.writeln(methodGenerator.generate('maybeMap'));
-        this.sb.writeln(methodGenerator.generate('mapOrNull'));
-        this.sb.writeln(methodGenerator.generate('when'));
-        this.sb.writeln(methodGenerator.generate('maybeWhen'));
-        this.sb.writeln(methodGenerator.generate('whenOrNull'));
+        const methods = new AdaptiveMethodGenerator(this.element)
+            .generate('map')
+            .generate('maybeMap')
+            .generate('mapOrNull')
+            .generate('when')
+            .generate('maybeWhen')
+            .generate('whenOrNull').toList();
+        this.sb.writeBlock(methods, '\n', 1);
         return this;
     }
 

@@ -1,8 +1,9 @@
 import { ActionValue, ElementKind, FieldElement } from '../interface';
 import { ClassDataTemplate, SubclassTemplate } from '../templates';
+import '../types/string';
 import { buildString, StringBuffer } from '../utils/string-buffer';
 
-type MethodType = 'when' | 'maybeWhen' | 'whenOrNull' | 'map' | 'maybeMap' | 'mapOrNull';
+export type MethodType = 'when' | 'maybeWhen' | 'whenOrNull' | 'map' | 'maybeMap' | 'mapOrNull';
 
 /**
  * The adaptive methods generator for enum and data class.
@@ -15,6 +16,7 @@ export class AdaptiveMethodGenerator implements ActionValue {
     private readonly superclass: string;
     private sb: StringBuffer = new StringBuffer();
     private methodType: MethodType = 'when';
+    private buffer: Set<string> = new Set();
 
     constructor(private readonly element: ClassDataTemplate) {
         this.factories = element.factories;
@@ -23,39 +25,23 @@ export class AdaptiveMethodGenerator implements ActionValue {
         this.superclass = element.name.decapitalize();
     }
 
-    /**
-     * @example
-     * // Method expression.
-     * R map<R>({
-     *   required R Function(Result loading) loading,
-     *   required R Function(Result error) error,
-     *   required R Function(Result data) data,
-     * }) {
-     *   //...
-     * }
-     */
     get value(): string {
-        return this.generate(this.methodType);
+        return this.sb.toString();
     }
 
     get insertion(): string {
         return '\n' + this.value + '\n';
     }
 
-    static fromElement(element: ClassDataTemplate): AdaptiveMethodGenerator {
-        return new AdaptiveMethodGenerator(element);
-    }
-
-    get(methodType: MethodType): this {
+    generate(methodType: MethodType): this {
         this.initialize(methodType);
         this.writeMethod();
+        this.buffer.add(this.value);
         return this;
     }
 
-    generate(methodType: MethodType): string {
-        this.initialize(methodType);
-        this.writeMethod();
-        return this.sb.toString();
+    toList(): string[] {
+        return [...this.buffer];
     }
 
     private initialize(methodType: MethodType) {

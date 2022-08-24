@@ -20,12 +20,10 @@ export class EnumDataGenerator {
     get extension(): ActionValue {
         const value = buildString((sb) => {
             sb.write(this.extensionTitle);
+            sb.writeBlock(this.checkers.map((e) => e.value));
             sb.writeln();
-            sb.writeBlock(this.checkers.map((e) => e.value), undefined, 1);
-            sb.writeln();
-            sb.writeln();
-            sb.writeBlock(this.methods.map((e) => e.value), undefined, 1);
-            sb.writeln('}');
+            sb.writeAll(this.methods.map((e) => e.insertion));
+            sb.write('}');
         });
 
         return {
@@ -35,14 +33,13 @@ export class EnumDataGenerator {
     }
 
     get methods(): ActionValue[] {
-        const methodGenerator = AdaptiveMethodGenerator.fromElement(this.element);
         return [
-            methodGenerator.get('map'),
-            methodGenerator.get('maybeMap'),
-            methodGenerator.get('mapOrNull'),
-            methodGenerator.get('when'),
-            methodGenerator.get('maybeWhen'),
-            methodGenerator.get('whenOrNull'),
+            new AdaptiveMethodGenerator(this.element).generate('map'),
+            new AdaptiveMethodGenerator(this.element).generate('maybeMap'),
+            new AdaptiveMethodGenerator(this.element).generate('mapOrNull'),
+            new AdaptiveMethodGenerator(this.element).generate('when'),
+            new AdaptiveMethodGenerator(this.element).generate('maybeWhen'),
+            new AdaptiveMethodGenerator(this.element).generate('whenOrNull'),
         ];
     }
 

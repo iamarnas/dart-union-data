@@ -170,6 +170,17 @@ export class DartCodeProvider extends CodeReader {
         return fix;
     }
 
+    deleteFix(
+        range: vscode.Range,
+        title: string,
+    ): vscode.CodeAction {
+        const fix = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
+        fix.edit = new vscode.WorkspaceEdit();
+        fix.isPreferred = true;
+        fix.edit.delete(this.document.uri, range);
+        return fix;
+    }
+
     command(command: vscode.Command): vscode.CodeAction {
         const action = new vscode.CodeAction(command.title, vscode.CodeActionKind.QuickFix);
         action.command = command;

@@ -231,6 +231,14 @@ export abstract class CodeReader {
             if (isCodeDependentLine) continue;
 
             if (containAnyCharacter) {
+                // The second line from the top.
+                const secondLine = this.lineAt(line.lineNumber - 1);
+
+                if (secondLine.isEmptyOrWhitespace) {
+                    // Keep the space between the instances.
+                    return range.with({ start: this.lineAt(secondLine.lineNumber - 1).range.end });
+                }
+
                 return range.with({ start: line.range.end });
             }
         }
