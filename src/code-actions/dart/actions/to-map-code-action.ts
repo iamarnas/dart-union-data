@@ -14,6 +14,10 @@ export class ToMapCodeAction implements CodeActionValue {
         this.value = this.generator.writeToMap().generate();
     }
 
+    get key(): string {
+        throw new Error('Method not implemented.');
+    }
+
     private get lines() {
         return this.provider.rangeToLines(this.range);
     }

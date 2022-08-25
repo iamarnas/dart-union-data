@@ -24,6 +24,10 @@ export class EqualityCodeAction implements CodeActionValue {
         this.deepEquality = new DeepEqualityCodeAction(provider, generated.deepEquality);
     }
 
+    get key(): string {
+        return this.items.map((e) => e.key)[0];
+    }
+
     get items(): CodeActionValue[] {
         if (this.useEquatable) return [this.equatable];
         if (this.useDeepEquality) return [this.deepEquality, this.hashCode];
@@ -75,6 +79,10 @@ export class EqualityCodeAction implements CodeActionValue {
 class EqualityOperatorCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
 
+    get key(): string {
+        return this.action.key;
+    }
+
     get value(): string {
         return this.action.value;
     }
@@ -121,6 +129,10 @@ class EqualityOperatorCodeAction implements CodeActionValue {
 
 class HashCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
+
+    get key(): string {
+        return this.action.key;
+    }
 
     get value(): string {
         return this.action.value;
@@ -177,6 +189,10 @@ class HashCodeAction implements CodeActionValue {
 class EquatableCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
 
+    get key(): string {
+        return this.action.key;
+    }
+
     get value(): string {
         return this.action.value;
     }
@@ -231,6 +247,10 @@ class EquatableCodeAction implements CodeActionValue {
 
 class DeepEqualityCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
+
+    get key(): string {
+        return this.action.key;
+    }
 
     get value(): string {
         return this.action.value;

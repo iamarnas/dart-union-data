@@ -33,13 +33,21 @@ export class DartCodeProvider extends CodeReader {
 
     get data(): DartClassDataProvider | undefined {
         if (this.element && this.element.kind === ElementKind.class) {
-            return new DartClassDataProvider(this, this.element);
+            try {
+                return new DartClassDataProvider(this, this.element);
+            } catch (error) {
+                console.error(error);
+            }
         }
     }
 
     get enum(): DartEnumDataProvider | undefined {
         if (this.element && this.element.kind === ElementKind.enum) {
-            return new DartEnumDataProvider(this, this.element);
+            try {
+                return new DartEnumDataProvider(this, this.element);
+            } catch (error) {
+                console.error(error);
+            }
         }
     }
 

@@ -12,6 +12,10 @@ export class ToStringCodeAction implements CodeActionValue {
         this.value = new ToStringMethodGenerator(element).value;
     }
 
+    get key(): string {
+        throw new Error('Method not implemented.');
+    }
+
     get insertion(): string {
         return '\n\t@override\n' + this.value + '\n';
     }

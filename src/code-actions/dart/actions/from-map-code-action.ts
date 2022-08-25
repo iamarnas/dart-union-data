@@ -15,7 +15,8 @@ export class FromMapCodeAction implements CodeActionValue {
         this.generator = new MapMethodGenerator(element);
         this.value = this.generator.writeFromMap().generate();
     }
-    delete(): void {
+
+    get key(): string {
         throw new Error('Method not implemented.');
     }
 
@@ -103,6 +104,10 @@ export class FromMapCodeAction implements CodeActionValue {
 
     update() {
         this.provider.replace(this);
+    }
+
+    delete(): void {
+        throw new Error('Method not implemented.');
     }
 }
 

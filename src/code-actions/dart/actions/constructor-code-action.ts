@@ -12,6 +12,10 @@ export class ConstructorCodeAction implements CodeActionValue {
         this.value = '\t' + new DartCodeGenerator(element).writeConstructor().generate();
     }
 
+    get key(): string {
+        throw new Error('Method not implemented.');
+    }
+
     get insertion(): string {
         const space = this.provider.start.isEmptyOrWhitespace ? '' : '\n';
         return '\n' + this.value + space;

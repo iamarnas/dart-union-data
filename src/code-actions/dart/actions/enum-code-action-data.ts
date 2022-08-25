@@ -20,8 +20,7 @@ export class EnumCodeActionData {
     }
 
     get items(): CodeActionValue[] {
-        if (!this.element.isEnhancedEnum) return [this.extension];
-        return [...this.checkers, ...this.methods, this.extension];
+        return [...this.checkers, ...this.methods];
     }
 
     get hasChecker(): boolean {
@@ -124,6 +123,10 @@ export class EnumCodeActionData {
 class EnumCheckerCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
 
+    get key(): string {
+        return this.action.key;
+    }
+
     get value(): string {
         return this.action.value;
     }
@@ -181,6 +184,10 @@ class EnumCheckerCodeAction implements CodeActionValue {
 class EnumMethodCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
 
+    get key(): string {
+        return this.action.key;
+    }
+
     get value(): string {
         return this.action.value;
     }
@@ -205,7 +212,7 @@ class EnumMethodCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+        return this.provider.whereCodeFirstLine((line) => line.text.includes(this.key), this.provider.codeLines);
     }
 
     fix(): vscode.CodeAction {
@@ -227,6 +234,10 @@ class EnumMethodCodeAction implements CodeActionValue {
 
 class EnumExtensionCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
+
+    get key(): string {
+        return this.action.key;
+    }
 
     get value(): string {
         return this.action.value;
@@ -252,7 +263,14 @@ class EnumExtensionCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value);
+        // The generated enum name.
+        const name = this.key.slice(this.key.lastIndexOf('on ') + 2, this.key.lastIndexOf('{')).trim();
+        // The dynamic search to define extension range even if the user modified extension name.
+        return this.provider.whereCodeFirstLine((line) => {
+            return line.text.trimStart().startsWith('extension ')
+                && line.text.trimEnd().endsWith('{')
+                && line.text.includesAll('on ', name);
+        });
     }
 
     fix(): vscode.CodeAction {

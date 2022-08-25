@@ -30,6 +30,10 @@ export class CopyWithCodeAction implements CodeActionValue {
         return [this.getter, ...this.itemsWithoutGetter];
     }
 
+    get key(): string {
+        throw new Error('Method not implemented.');
+    }
+
     /**
      * The value of the `copyWith` implementation. 
      * The {@link getter} value will not be included in this value 
@@ -100,6 +104,10 @@ export class CopyWithCodeAction implements CodeActionValue {
 class CopyWithMethodCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
 
+    get key(): string {
+        return this.action.key;
+    }
+
     get value(): string {
         return this.action.value;
     }
@@ -147,6 +155,10 @@ class CopyWithMethodCodeAction implements CodeActionValue {
 class CopyWithGetterCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
 
+    get key(): string {
+        return this.action.key;
+    }
+
     get value(): string {
         return this.action.value;
     }
@@ -193,6 +205,10 @@ class CopyWithGetterCodeAction implements CodeActionValue {
 
 class CopyWithInterfaceCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
+
+    get key(): string {
+        return this.action.key;
+    }
 
     get value(): string {
         return this.action.value;
@@ -244,6 +260,10 @@ class CopyWithInterfaceCodeAction implements CodeActionValue {
 
 class CopyWithImplementionCodeAction implements CodeActionValue {
     constructor(private provider: DartCodeProvider, private action: ActionValue) { }
+
+    get key(): string {
+        return this.action.key;
+    }
 
     get value(): string {
         return this.action.value;

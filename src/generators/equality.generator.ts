@@ -37,6 +37,13 @@ class EqualityOperatorGenerator implements ActionValue {
     }
 
     /**
+     * @example 'bool operator ==('
+     */
+    get key(): string {
+        return 'bool operator ==(';
+    }
+
+    /**
      * @example name == other.name
      */
     private get otherNames(): string[] {
@@ -76,6 +83,13 @@ class EquatableGenerator implements ActionValue {
             : element.instances;
     }
 
+    /**
+     * @example 'List<Object?> get props =>'
+     */
+    get key(): string {
+        return 'List<Object?> get props =>';
+    }
+
     get value(): string {
         return this.equality();
     }
@@ -91,21 +105,14 @@ class EquatableGenerator implements ActionValue {
         return this.parameters.expressionsOf('name');
     }
 
-    /**
-     * @example 'List<Object?> get props => '
-     */
-    get getter(): string {
-        return 'List<Object?> get props => ';
-    }
-
     private equality(): string {
-        const expression = `${this.getter}[${this.props.join(', ')}];`;
+        const expression = `${this.key} [${this.props.join(', ')}];`;
 
         return buildString((sb) => {
             if (expression.length < 78) {
                 sb.write(expression, 1);
             } else {
-                sb.write(`${this.getter}[`, 1);
+                sb.write(`${this.key} [`, 1);
                 sb.writeBlock(this.props, ',', 4);
                 sb.writeln('];', 3);
             }
@@ -120,6 +127,13 @@ class DeepCollectionOperatorGenerator implements ActionValue {
         this.typeInterface = element.typeInterface;
     }
 
+    /**
+     * @example 'bool operator ==('
+     */
+    get key(): string {
+        return 'bool operator ==(';
+    }
+
     get value(): string {
         return this.deepCollectionOperator();
     }
@@ -130,7 +144,7 @@ class DeepCollectionOperatorGenerator implements ActionValue {
 
     private deepCollectionOperator(): string {
         return buildString((sb) => {
-            sb.write('bool operator ==(Object other) {', 1);
+            sb.write(this.key + 'Object other) {', 1);
             sb.writeln('if (runtimeType != other.runtimeType) return false;', 2);
             sb.writeln('final mapEquals = const DeepCollectionEquality().equals;', 2);
             sb.writeln(`return other is ${this.typeInterface} && `, 2);
@@ -149,6 +163,13 @@ class HashCodeGenerator implements ActionValue {
             ? element.parameters
             : element.instances;
         this.settings = element.settings;
+    }
+
+    /**
+     * @example 'int get hashCode =>'
+     */
+    get key(): string {
+        return 'int get hashCode =>';
     }
 
     get value(): string {
@@ -173,10 +194,6 @@ class HashCodeGenerator implements ActionValue {
         return this.parameters.expressionsOf('hashCode');
     }
 
-    get getter(): string {
-        return 'int get hashCode => ';
-    }
-
     private hashCodeValue(): string {
         if (this.settings.sdkVersion >= 2.14) {
             return this.hashCodeFromObject();
@@ -187,14 +204,14 @@ class HashCodeGenerator implements ActionValue {
 
     private hashCode(): string {
         const hashCodes = !this.hashCodes.length ? '0;' : `${this.hashCodes.join(' ^ ')};`;
-        const expression = `${this.getter}${hashCodes}`;
+        const expression = `${this.key} ${hashCodes}`;
 
         return buildString((sb) => {
             if (expression.length < 78) {
                 sb.write(expression, 1);
             } else {
                 // Block
-                sb.write(this.getter + '\n', 1);
+                sb.write(this.key + '\n', 1);
                 sb.writeAll(this.hashCodes, ' ^\n', 3);
                 sb.write(';');
             }
@@ -203,7 +220,7 @@ class HashCodeGenerator implements ActionValue {
 
     private hashCodeFromObject(): string {
         const objects = !this.names.length ? '0;' : `${this.names.join(', ')}`;
-        const expression = `${this.getter}Object.hash(${objects});`;
+        const expression = `${this.key} Object.hash(${objects});`;
 
         return buildString((sb) => {
             // Object.hash() requires at least two values.
@@ -212,17 +229,17 @@ class HashCodeGenerator implements ActionValue {
                     sb.write(expression, 1);
                 } else {
                     // Block
-                    sb.write(`${this.getter}Object.hash(`, 1);
+                    sb.write(`${this.key} Object.hash(`, 1);
                     sb.writeBlock(this.names, ',', 4);
                     sb.writeln(');', 2);
                 }
             } else {
                 if (this.parameters.isEmpty) {
-                    sb.write(`${this.getter}${objects}`, 1);
+                    sb.write(`${this.key} ${objects}`, 1);
                     return;
                 }
 
-                sb.write(`${this.getter}${objects}.hashCode;`, 1);
+                sb.write(`${this.key} ${objects}.hashCode;`, 1);
             }
         });
     }

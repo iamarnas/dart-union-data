@@ -15,7 +15,7 @@ export class ToStringMethodGenerator implements ActionValue {
         this.className = element.name;
     }
 
-    get title(): string {
+    get key(): string {
         return 'String toString()';
     }
 
@@ -38,7 +38,7 @@ export class ToStringMethodGenerator implements ActionValue {
 
     private blockBody(): string {
         return buildString((sb) => {
-            sb.write(`${this.title} {`, 1);
+            sb.write(`${this.key} {`, 1);
             sb.writeln(`return ${this.callbackValue}`, 2);
             sb.writeln('}', 1);
         });
@@ -48,7 +48,7 @@ export class ToStringMethodGenerator implements ActionValue {
      * @example 'String toString() => Result<$T>(value: $value, error: $error);'
      */
     private lineBody(): string {
-        return `${this.title} => ${this.value}`;
+        return `${this.key} => ${this.value}`;
     }
 
     private get isOneLine(): boolean {

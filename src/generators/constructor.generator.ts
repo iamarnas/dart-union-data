@@ -36,6 +36,14 @@ class GenerativeConstructorGenerator implements ActionValue {
         }
     }
 
+    /**
+     * The key represents the initialization expression of the constructor.
+     * @example `const ClassName(` or const `ClassName({`
+     */
+    get key(): string {
+        return this.value.slice(0, this.value.indexOf('('));
+    }
+
     get value(): string {
         return buildString((sb) => {
             sb.write(this.modifier());
@@ -171,6 +179,17 @@ class SuperConstructorGenerator implements ActionValue {
         }
 
         this.sdkVersion = element.settings.sdkVersion;
+    }
+
+    /**
+     * The key represents the initialization expression of the constructor.
+     * @example 
+     * ' : super(' 
+     * // If empty.
+     * ';'
+     */
+    get key(): string {
+        return this.value.slice(0, this.value.indexOf('('));
     }
 
     get value(): string {

@@ -18,6 +18,10 @@ export class FromJsonCodeAction implements CodeActionValue {
         this.position = position ?? provider.withinCode();
     }
 
+    get key(): string {
+        throw new Error('Method not implemented.');
+    }
+
     get isGenerated(): boolean {
         return this.range !== undefined;
     }

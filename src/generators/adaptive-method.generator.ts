@@ -3,7 +3,7 @@ import { ClassDataTemplate, SubclassTemplate } from '../templates';
 import '../types/string';
 import { buildString, StringBuffer } from '../utils/string-buffer';
 
-export type MethodType = 'when' | 'maybeWhen' | 'whenOrNull' | 'map' | 'maybeMap' | 'mapOrNull';
+type MethodType = 'when' | 'maybeWhen' | 'whenOrNull' | 'map' | 'maybeMap' | 'mapOrNull';
 
 /**
  * The adaptive methods generator for enum and data class.
@@ -31,6 +31,10 @@ export class AdaptiveMethodGenerator implements ActionValue {
 
     get insertion(): string {
         return '\n' + this.value + '\n';
+    }
+
+    get key(): string {
+        return `${this.methodType}<`;
     }
 
     generate(methodType: MethodType): this {

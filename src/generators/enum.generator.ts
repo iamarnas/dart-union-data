@@ -13,7 +13,7 @@ export class EnumDataGenerator {
             console.error(SyntaxError('Error due to invalid element type'));
         }
 
-        this.name = element.name;
+        this.name = element.typeInterface;
         this.values = element.fields;
     }
 
@@ -27,6 +27,7 @@ export class EnumDataGenerator {
         });
 
         return {
+            key: this.extensionTitle,
             value: value,
             insertion: '\n' + value + '\n',
         };
@@ -67,14 +68,22 @@ class EnumCheckerGenerator implements ActionValue {
     constructor(private field: FieldElement, readonly className: string) { }
 
     /**
+     * The trimmed Enum member value.
+     * @example 'bool get isLoading => this == Result.loading;'
+     */
+    get key(): string {
+        return this.value.trim();
+    }
+
+    /**
      * @example 
      * // The enum checker.
      * bool get isLoading => this == Result.loading;
      */
     get value(): string {
-        const name = !this.field.name ? this.field.element.name : this.field.name;
-        const value = name.trimStart().capitalize();
-        return `\tbool get is${value} => this == ${this.className}.${name};`;
+        const value = !this.field.name ? this.field.element.name : this.field.name;
+        const name = value.capitalize();
+        return `\tbool get is${name} => this == ${this.className}.${value};`;
     }
 
     get insertion(): string {

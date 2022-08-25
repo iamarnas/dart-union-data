@@ -18,15 +18,22 @@ export class CopyWithGenerator {
 
 class CopyWithMethodGenerator implements ActionValue {
     private readonly className: string;
+    private readonly typeInterface: string;
     private readonly parameters: ParametersTemplate;
-    private readonly generic: GenericTypeTemplate;
 
     constructor(element: SubclassTemplate | ClassDataTemplate) {
         this.parameters = element instanceof ClassDataTemplate
             ? element.instances
             : element.parameters;
-        this.generic = element.generic;
         this.className = element.name;
+        this.typeInterface = element.typeInterface;
+    }
+
+    /**
+     * @example 'ClassName<T> copyWith({'
+     */
+    get key(): string {
+        return `${this.typeInterface} copyWith({`;
     }
 
     get value(): string {
@@ -46,12 +53,11 @@ class CopyWithMethodGenerator implements ActionValue {
     }
 
     private method(): string {
-        const className = this.className + this.generic.type;
         return buildString((sb) => {
-            sb.write(`${className} copyWith({`, 1);
+            sb.write(this.key, 1);
             sb.writeBlock(this.nullableParams, ',', 2);
             sb.writeln('}) {', 1);
-            sb.writeln(`return ${className}(`, 2);
+            sb.writeln(`return ${this.className}(`, 2);
             sb.writeBlock(this.callbacksParams, ',', 3);
             sb.writeln(');', 2);
             sb.writeln('}', 1);
@@ -66,6 +72,14 @@ class CopyWithGetterGenerator implements ActionValue {
     constructor(element: SubclassTemplate | ClassDataTemplate) {
         this.generic = element.generic;
         this.className = element.name + 'CopyWith';
+    }
+
+    /**
+     * The key is identical to value due that this value is a one-line method and single class member.
+     * @example 'UserCopyWith<T> get copyWith => _UserCopyWith(this);'
+     */
+    get key(): string {
+        return this.value;
     }
 
     /**
@@ -93,6 +107,14 @@ class CopyWithInterfaceGenerator implements ActionValue {
             : element.parameters;
         this.generic = element.generic;
         this.className = element.name + 'CopyWith';
+    }
+
+    /**
+     * The key represents the first row of the class.
+     * @example `abstract class ClassName<T> {`
+     */
+    get key(): string {
+        return this.value.split('\n')[0];
     }
 
     get value(): string {
@@ -131,6 +153,14 @@ class CopyWithImplementationGenerator implements ActionValue {
             : element.parameters;
         this.generic = element.generic;
         this.className = element.name + 'CopyWith';
+    }
+
+    /**
+     * The key represents the first row of the class.
+     * @example `class SubClass<T> extends _SuperClass<T> {`
+     */
+    get key(): string {
+        return this.value.split('\n')[0];
     }
 
     get value(): string {
