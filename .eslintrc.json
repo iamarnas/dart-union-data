@@ -20,6 +20,8 @@
                 "read-only": "array-simple"
             }
         ],
+        "@typescript-eslint/no-extra-semi": "error",
+        "no-extra-semi": "off",
         "curly": [
             "error",
             "multi-line"

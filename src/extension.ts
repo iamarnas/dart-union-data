@@ -9,7 +9,7 @@ import {
 	UPDATE_COMMAND,
 	UPDATE_ENUM_COMMAND
 } from './code-actions';
-import { DartCodeInfo, subscribeToDartLanguageDocumentChanges } from './diagnostics';
+import { DartDiagnosticCodeActionProvider, subscribeToDartLanguageDocumentChanges } from './diagnostics';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -54,15 +54,15 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
-	const dartCodeDiagnostics = vscode.languages.createDiagnosticCollection('dart_code');
+	const dartCodeDiagnostics = vscode.languages.createDiagnosticCollection('dart_code_collection');
 
 	context.subscriptions.push(dartCodeDiagnostics);
 
 	subscribeToDartLanguageDocumentChanges(context, dartCodeDiagnostics);
 
 	context.subscriptions.push(
-		vscode.languages.registerCodeActionsProvider('dart', new DartCodeInfo(), {
-			providedCodeActionKinds: DartCodeInfo.providedCodeActionKinds
+		vscode.languages.registerCodeActionsProvider('dart', new DartDiagnosticCodeActionProvider(), {
+			providedCodeActionKinds: DartDiagnosticCodeActionProvider.providedCodeActionKinds
 		})
 	);
 

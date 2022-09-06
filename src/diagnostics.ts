@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DartEnumDataProvider } from './code-actions';
 import { DartCodeProvider } from './code-actions/dart/dart-code-provider';
 import { CodeActionValue } from './interface';
+import './types/string';
 
 /** Code that is used to associate diagnostic entries with enum code actions. */
 export const ENUM_MENTION = 'enum_class';
@@ -35,18 +36,22 @@ function refreshDiagnostics(doc: vscode.TextDocument, selection: vscode.Range, c
 	}
 
 	for (const provider of [...buffer]) {
-		const enumData = provider.enum;
-		const classData = provider.data;
+		const enumClass = provider.enum;
+		const clazz = provider.data;
 
-		if (enumData !== undefined) {
+		if (enumClass !== undefined) {
 			if (provider.enum?.hasChanges ?? false) {
+				const replacements = [
+					...enumClass.data.replacements.map((e) => createEnumMethodDiagnostic(e, enumClass, provider.document)),
+					...enumClass.data.extension.replacements.map((e) => createEnumMethodDiagnostic(e, enumClass, provider.document)),
+				];
+
 				diagnostics.push(createEnumClassDiagnostic(provider));
-				diagnostics.push(...enumData.data.replacements.map((e) => createEnumMethodDiagnostic(e, enumData)));
-				diagnostics.push(...enumData.data.extension.replacements.map((e) => createEnumMethodDiagnostic(e, enumData)));
+				diagnostics.push(...replacements);
 			}
 		}
 
-		if (classData !== undefined) {
+		if (clazz !== undefined) {
 			if (provider.data?.hasChanges ?? false) {
 				diagnostics.push(createDataClassDiagnostic(provider));
 			}
@@ -83,21 +88,32 @@ function createEnumClassDiagnostic(provider: DartCodeProvider): vscode.Diagnosti
 	return diagnostic;
 }
 
-function createEnumMethodDiagnostic(action: CodeActionValue, provider: DartEnumDataProvider): vscode.Diagnostic {
+function createEnumMethodDiagnostic(
+	action: CodeActionValue,
+	provider: DartEnumDataProvider,
+	doc: vscode.TextDocument,
+): vscode.Diagnostic {
+	// The start line.
+	const line = doc.lineAt(action.position);
+	// Method name.
 	const name = action.key.slice(0, -1);
+	// Names of new added values.
 	const insertions = [...provider.data.extension.insertions, ...provider.data.insertions]
-		.map((e) => e.key.slice(e.key.lastIndexOf('.') + 1, e.key.lastIndexOf(';')))
+		.map((e) => e.key.getRange('.', ';', true))
 		.join(', ');
+	// Names that do not match enum values.
 	const removals = [...provider.data.extension.removals, ...provider.data.removals]
-		.map((e) => e.text.slice(e.text.lastIndexOf('.') + 1, e.text.lastIndexOf(';')))
+		.map((e) => e.text.getRange('.', ';', true))
 		.join(', ');
-	const valuesToImplement = insertions.length === 0 ? '' : `\nTry adding missing values: ${insertions}.`;
-	const valuesToRemove = removals.length === 0 ? '' : `\nTry to remove non existent functions: ${removals}.`;
+	const valuesToImplement = insertions.length === 0
+		? ''
+		: `\nTry adding missing values: ${insertions}.`;
+	const valuesToRemove = removals.length === 0
+		? ''
+		: `\nTry to remove non existent functions: ${removals}.`;
 
-	const diagnostic = new vscode.Diagnostic(new vscode.Range(
-		new vscode.Position(action.position.line, action.value.indexOf(action.value.trimStart()[0]) + 1),
-		new vscode.Position(action.position.line, action.value.split('\n')[0].length),
-	),
+	const diagnostic = new vscode.Diagnostic(
+		line.range.with(line.range.start.with({ character: line.firstNonWhitespaceCharacterIndex })),
 		`Method '${name}' does not match all enum values.` + `${valuesToImplement} ${valuesToRemove}`,
 		vscode.DiagnosticSeverity.Warning,
 	);
@@ -147,7 +163,7 @@ export function subscribeToDartLanguageDocumentChanges(context: vscode.Extension
 /**
  * Provides code actions corresponding to diagnostic problems.
  */
-export class DartCodeInfo implements vscode.CodeActionProvider {
+export class DartDiagnosticCodeActionProvider implements vscode.CodeActionProvider {
 	public static readonly providedCodeActionKinds = [
 		vscode.CodeActionKind.QuickFix
 	];

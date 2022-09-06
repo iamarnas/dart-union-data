@@ -79,6 +79,8 @@ export class MapMethodGenerator {
     }
 
     private fromMapItem(param: Parameter): string {
+        const nullable = param.hasDefault && !param.type.endsWith('?') ? '?' : '';
+
         return buildString((sb) => {
             switch (param.identity) {
                 case 'DateTime':
@@ -121,7 +123,6 @@ export class MapMethodGenerator {
                     sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
                     break;
                 default:
-                    const nullable = param.hasDefault && !param.type.endsWith('?') ? '?' : '';
                     sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type}${nullable}`, 4);
 
                     if (param.hasDefault) {

@@ -106,13 +106,13 @@ export class ClassDataTemplate implements ClassElement {
         for (const variable of merged.all) {
             if (formalPrameters.has(variable.name)) {
                 parameters.push(variable);
-            };
+            }
         }
 
         for (const variable of merged.all) {
             if (!formalPrameters.has(variable.name)) {
                 parameters.push(variable);
-            };
+            }
         }
 
         // Update the buffer so that it matches the super constructor order.

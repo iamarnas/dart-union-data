@@ -189,7 +189,7 @@ class CopyWithImplementationGenerator implements ActionValue {
                 return line;
             }
 
-            return `${name}${e.name} == _undefined${newln}? ${modifier}value.${e.name}${newln}: ${e.name}${asType}`;;
+            return `${name}${e.name} == _undefined${newln}? ${modifier}value.${e.name}${newln}: ${e.name}${asType}`;
         });
     }
 

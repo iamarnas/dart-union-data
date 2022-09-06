@@ -1,7 +1,7 @@
 import './array';
 
 String.prototype.lengthOf = function (symbol: string): number {
-    return String(this).split('').filter((e) => e === symbol).length;;
+    return String(this).split('').filter((e) => e === symbol).length;
 };
 
 String.prototype.decapitalize = function (): string {
