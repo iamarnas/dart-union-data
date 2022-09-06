@@ -22,8 +22,8 @@ export interface CodeActionValue extends ActionValue {
     isUpdated: boolean,
     range: Range | undefined;
     fix(): CodeAction;
-    update(): void,
-    delete(): void,
+    update(): Promise<void>,
+    delete(): Promise<void>,
 }
 
 export type CodeActionValueReplace = Pick<CodeActionValue, 'range'> & Required<Pick<CodeActionValue, 'value'>>;

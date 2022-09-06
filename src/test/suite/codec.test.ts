@@ -4,12 +4,11 @@ import { DartParameterCodec } from '../../codecs/dart-parameter-codec';
 import { Parameter } from '../../models/parameter';
 
 suite('ParameterCodec Test Suite', () => {
-    const codec = new DartParameterCodec();
 
     describe('encode', () => {
         it('should read all modifiers', () => {
             assert.deepStrictEqual(
-                codec.encode('required final String name', 'named'),
+                DartParameterCodec.encode('required final String name', 'named'),
                 new Parameter({
                     type: 'String',
                     name: 'name',
@@ -23,7 +22,7 @@ suite('ParameterCodec Test Suite', () => {
 
         it('should not split generic type', () => {
             assert.deepStrictEqual(
-                codec.encode('Map<String, Object?> data', 'required'),
+                DartParameterCodec.encode('Map<String, Object?> data', 'required'),
                 new Parameter({
                     type: 'Map<String, Object?>',
                     name: 'data',
@@ -33,7 +32,7 @@ suite('ParameterCodec Test Suite', () => {
 
         it('should match nullable positional parameter', () => {
             assert.deepStrictEqual(
-                codec.encode('int? code', 'positional'),
+                DartParameterCodec.encode('int? code', 'positional'),
                 new Parameter({
                     type: 'int?',
                     name: 'code',
@@ -46,7 +45,7 @@ suite('ParameterCodec Test Suite', () => {
 
         it('should encode generic function parameter', () => {
             assert.deepStrictEqual(
-                codec.encode('Map<String, dynamic> Function(dynamic) json', 'required'),
+                DartParameterCodec.encode('Map<String, dynamic> Function(dynamic) json', 'required'),
                 new Parameter({
                     type: 'Map<String, dynamic> Function(dynamic)',
                     name: 'json',
@@ -56,7 +55,7 @@ suite('ParameterCodec Test Suite', () => {
 
         it('should encode constant default value', () => {
             assert.deepStrictEqual(
-                codec.encode('List<String> data = const []', 'required'),
+                DartParameterCodec.encode('List<String> data = const []', 'required'),
                 new Parameter({
                     type: 'List<String>',
                     name: 'data',
@@ -68,7 +67,7 @@ suite('ParameterCodec Test Suite', () => {
 
         it('should encode default value', () => {
             assert.deepStrictEqual(
-                codec.encode('int code = 200', 'required'),
+                DartParameterCodec.encode('int code = 200', 'required'),
                 new Parameter({
                     type: 'int',
                     name: 'code',
@@ -80,7 +79,7 @@ suite('ParameterCodec Test Suite', () => {
     });
 
     describe('decode', () => {
-        const codec = new DartParameterCodec();
+        const codec = DartParameterCodec;
         const param = new Parameter({ type: 'int', name: 'code' });
         const nullable = new Parameter({ type: 'int?', name: 'code', isNullable: true });
         const named = new Parameter({ type: 'int', name: 'code', isNamed: true, isOptional: true });

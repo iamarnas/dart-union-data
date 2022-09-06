@@ -87,6 +87,6 @@ class EnumCheckerGenerator implements ActionValue {
     }
 
     get insertion(): string {
-        return '\n' + this.value + '\n';
+        return '\n' + this.value;
     }
 }

@@ -13,7 +13,7 @@ type BufferParameter = Pick<Parameter, 'name'> & Partial<Omit<Parameter, 'name'>
 export class ParametersTemplate {
     private buffer = new Map<string, Parameter>();
 
-    constructor(private readonly converter: ParameterConverter) {
+    constructor(converter: ParameterConverter) {
         for (const param of converter.getParameters()) {
             this.buffer.set(param.name, param);
         }

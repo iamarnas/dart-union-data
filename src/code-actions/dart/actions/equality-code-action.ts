@@ -67,12 +67,12 @@ export class EqualityCodeAction implements CodeActionValue {
         );
     }
 
-    update(): void {
-        this.provider.replace(...this.items);
+    async update(): Promise<void> {
+        await this.provider.replace(...this.items);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }
 
@@ -92,7 +92,7 @@ class EqualityOperatorCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange('bool operator ==(', this.provider.codeLines);
+        return this.provider.reader.findCodeRange('bool operator ==(', this.provider.range);
     }
 
     get position(): vscode.Position {
@@ -106,7 +106,7 @@ class EqualityOperatorCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
@@ -118,12 +118,12 @@ class EqualityOperatorCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }
 
@@ -143,11 +143,11 @@ class HashCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        const startLine = this.provider.whereTextLine(['int get hashCode => '], this.provider.codeLines).at(0);
+        const startLine = this.provider.reader.whereTextLine(['int get hashCode => '], this.provider.range).at(0);
 
         if (!startLine) return;
 
-        const lastLine = this.provider.rangeWhere(startLine.range.start, (line) => line.text.trimEnd().endsWith(';'));
+        const lastLine = this.provider.reader.rangeWhere(startLine.range.start, (line) => line.text.trimEnd().endsWith(';'));
 
         if (!lastLine) return;
 
@@ -165,7 +165,7 @@ class HashCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
@@ -177,12 +177,12 @@ class HashCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }
 
@@ -210,11 +210,11 @@ class EquatableCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        const startLine = this.provider.whereTextLine(['List<Object?> get props => '], this.provider.codeLines).at(0);
+        const startLine = this.provider.reader.whereTextLine(['List<Object?> get props => '], this.provider.range).at(0);
 
         if (!startLine) return;
 
-        const lastLine = this.provider.rangeWhere(startLine.range.start, (line) => line.text.trimEnd().endsWith(';'));
+        const lastLine = this.provider.reader.rangeWhere(startLine.range.start, (line) => line.text.trimEnd().endsWith(';'));
 
         if (!lastLine) return;
 
@@ -224,7 +224,7 @@ class EquatableCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
@@ -236,12 +236,12 @@ class EquatableCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }
 
@@ -265,7 +265,7 @@ class DeepEqualityCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange('bool operator ==(', this.provider.codeLines);
+        return this.provider.reader.findCodeRange('bool operator ==(', this.provider.range);
     }
 
     get position(): vscode.Position {
@@ -275,7 +275,7 @@ class DeepEqualityCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
@@ -287,11 +287,11 @@ class DeepEqualityCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }

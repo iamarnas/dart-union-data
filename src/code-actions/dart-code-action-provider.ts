@@ -33,18 +33,15 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.
         if (element.kind === ElementKind.enum) {
             const enumCode = provider.enum;
 
-            if (!enumCode) return;
+            if (!enumCode || enumCode.isEmpty) return;
 
             console.log(enumCode);
 
-            if (enumCode.isEmpty) return;
-            if (enumCode.data.extension.isUpdated) return;
-
-            if (enumCode.data.hasChanges) {
-                actions.push(enumCode.updateCommand(enumCode));
+            if (enumCode.hasChanges) {
+                actions.push(enumCode.updateCommand([enumCode]));
             }
 
-            return actions.concat(...enumCode.data.actions);
+            return actions.concat(...enumCode.actions);
         }
 
         if (element.kind === ElementKind.class) {

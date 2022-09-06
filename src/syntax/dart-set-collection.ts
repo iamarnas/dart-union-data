@@ -1,7 +1,6 @@
 import { AssertionError } from 'assert';
-import { typeIdentities } from '../interface';
+import { GenericType, typeIdentities } from '../interface';
 import { getAbsoluteType, isPrimitive, Parameter } from '../models/parameter';
-import { hasGenericType } from '../templates';
 import { StringBuffer } from '../utils/string-buffer';
 import { DartMapCollection } from './dart-map-collection';
 
@@ -21,7 +20,7 @@ export class DartSetCollection {
         }
 
         const type = getAbsoluteType(param.type);
-        this.hasGeneric = hasGenericType(type);
+        this.hasGeneric = GenericType.isGeneric(type);
         this.maybeNull = param.isNullable || !param.isNullable && param.hasDefault ? '?' : '';
         this.castType = type === 'Set' || type === 'Set?'
             ? 'dynamic'

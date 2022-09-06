@@ -95,8 +95,7 @@ export class Parameter implements ParameterElement {
      * @returns parameter as string.
      */
     expression(expression: ParameterExpression = 'instance-variable'): string {
-        const codec = new DartParameterCodec();
-        return codec.decode(this, expression);
+        return DartParameterCodec.decode(this, expression);
     }
 }
 

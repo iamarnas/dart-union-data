@@ -9,6 +9,7 @@ import {
 	UPDATE_COMMAND,
 	UPDATE_ENUM_COMMAND
 } from './code-actions';
+import { DartCodeInfo, subscribeToDartLanguageDocumentChanges } from './diagnostics';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -30,26 +31,38 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(UPDATE_COMMAND, (arg) => {
+		vscode.commands.registerCommand(UPDATE_COMMAND, async (arg) => {
 			if (arg instanceof DartClassDataProvider) {
-				arg.updateChanges();
+				await arg.updateChanges();
 			}
 		})
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(GENERATE_COMMAND, (arg) => {
+		vscode.commands.registerCommand(GENERATE_COMMAND, async (arg) => {
 			if (arg instanceof DartClassDataProvider) {
-				arg.generateData();
+				await arg.generateData();
 			}
 		})
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand(UPDATE_ENUM_COMMAND, (arg) => {
+		vscode.commands.registerCommand(UPDATE_ENUM_COMMAND, async (arg) => {
 			if (arg instanceof DartEnumDataProvider) {
-				arg.updateChanges();
+				await arg.updateChanges();
 			}
+		})
+	);
+
+	const dartCodeDiagnostics = vscode.languages.createDiagnosticCollection('dart_code');
+
+	context.subscriptions.push(dartCodeDiagnostics);
+
+	subscribeToDartLanguageDocumentChanges(context, dartCodeDiagnostics);
+
+	context.subscriptions.push(
+		vscode.languages.registerCodeActionsProvider('dart', new DartCodeInfo(), {
+			providedCodeActionKinds: DartCodeInfo.providedCodeActionKinds
 		})
 	);
 

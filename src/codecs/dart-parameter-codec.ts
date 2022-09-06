@@ -19,10 +19,13 @@ export type ParameterExpression = 'this'
     | 'nullable'
     | 'super-params';
 
-export class DartParameterCodec {
-    constructor() { }
+export interface DartParameterCodec {
+    encode(input: string, type: ParameterType): Parameter;
+    decode(param: Parameter, expression: ParameterExpression): string
+}
 
-    encode(input: string, type: ParameterType): Parameter {
+export namespace DartParameterCodec {
+    export function encode(input: string, type: ParameterType): Parameter {
         const isOptional = type === 'named' || type === 'positional';
         const isPositional = type === 'positional';
         const isNamed = type === 'named';
@@ -79,7 +82,7 @@ export class DartParameterCodec {
         return parameter.copyWith(copy);
     }
 
-    decode(param: Parameter, expression: ParameterExpression): string {
+    export function decode(param: Parameter, expression: ParameterExpression): string {
         return buildString((sb) => {
             switch (expression) {
                 case 'this':

@@ -92,12 +92,12 @@ export class CopyWithCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(...this.items);
+    async update(): Promise<void> {
+        await this.provider.replace(...this.items);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }
 
@@ -127,12 +127,12 @@ class CopyWithMethodCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+        return this.provider.reader.findCodeRange(this.value, this.provider.range);
     }
 
     fix(): vscode.CodeAction {
@@ -143,12 +143,12 @@ class CopyWithMethodCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }
 
@@ -178,12 +178,12 @@ class CopyWithGetterCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+        return this.provider.reader.findCodeRange(this.value, this.provider.range);
     }
 
     fix(): vscode.CodeAction {
@@ -194,12 +194,12 @@ class CopyWithGetterCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }
 
@@ -215,7 +215,7 @@ class CopyWithInterfaceCodeAction implements CodeActionValue {
     }
 
     get insertion(): string {
-        if (this.provider.lineAt(this.position.line).isEmptyOrWhitespace) {
+        if (this.provider.reader.lineAt(this.position.line).isEmptyOrWhitespace) {
             return this.insertion;
         }
 
@@ -233,12 +233,12 @@ class CopyWithInterfaceCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getText(this.range),
+            this.provider.reader.getText(this.range),
         );
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value);
+        return this.provider.reader.findCodeRange(this.value);
     }
 
     fix(): vscode.CodeAction {
@@ -249,12 +249,12 @@ class CopyWithInterfaceCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }
 
@@ -284,12 +284,12 @@ class CopyWithImplementionCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getText(this.range),
+            this.provider.reader.getText(this.range),
         );
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value);
+        return this.provider.reader.findCodeRange(this.value);
     }
 
     fix(): vscode.CodeAction {
@@ -300,11 +300,11 @@ class CopyWithImplementionCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }

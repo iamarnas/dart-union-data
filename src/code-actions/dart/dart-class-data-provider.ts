@@ -66,7 +66,7 @@ export class DartClassDataProvider {
     }
 
     get hasConvertImport(): boolean {
-        return this.provider.lines.some((line) => {
+        return this.provider.reader.lines.some((line) => {
             return line.text.includesAll('import', 'dart:convert', ';');
         });
     }
@@ -117,7 +117,7 @@ export class DartClassDataProvider {
      * @returns `vscode.CodeAction`.
      */
     updateCommand(...args: any[]): vscode.CodeAction {
-        return this.provider.command({
+        return this.provider.createCommand({
             command: UPDATE_COMMAND,
             title: 'Update All Changes',
             tooltip: 'This will update all members of the class',
@@ -130,7 +130,7 @@ export class DartClassDataProvider {
      * @returns `vscode.CodeAction`.
      */
     generateCommand(...args: any[]): vscode.CodeAction {
-        return this.provider.command({
+        return this.provider.createCommand({
             command: GENERATE_COMMAND,
             title: 'Generate Class Data',
             tooltip: 'This will generate all members of the class',
@@ -138,23 +138,23 @@ export class DartClassDataProvider {
         });
     }
 
-    updateChanges() {
+    async updateChanges() {
         const editor = this.provider.editor;
         if (!editor || this.provider.document.languageId !== 'dart') return;
 
-        editor.edit((builder) => {
-            const removalsRanges = [...this.fromMap.removals, ...this.toMap.removals];
-            const insertionsItems = [...this.fromMap.insertions, ...this.toMap.insertions];
+        const removalsRanges = [...this.fromMap.removals, ...this.toMap.removals];
+        const insertionsItems = [...this.fromMap.insertions, ...this.toMap.insertions];
 
+        await editor.edit((builder) => {
             if (this.equality.equatable.isGenerated && !this.equality.useEquatable) {
                 const equatableRange = this.equality.equatable.range;
                 if (equatableRange) {
-                    removalsRanges.push(this.provider.rangeWithRemarks(equatableRange));
+                    removalsRanges.push(this.provider.reader.rangeWithRemarks(equatableRange));
                 }
             }
 
             for (const range of removalsRanges) {
-                builder.delete(this.provider.rangeWithRemarks(range));
+                builder.delete(this.provider.reader.rangeWithRemarks(range));
             }
 
             for (const item of insertionsItems) {
@@ -169,7 +169,7 @@ export class DartClassDataProvider {
         });
     }
 
-    generateData() {
+    async generateData() {
         const insertions: CodeActionValue[] = [];
 
         if (!this.hasConvertImport) {
@@ -182,6 +182,6 @@ export class DartClassDataProvider {
         const toStringIdx = this.values.findIndex((e) => e.value.includes('toString()'));
         const idx = toStringIdx !== -1 ? toStringIdx + 1 : this.values.length - 1;
 
-        this.provider.insert(...insertions, ...this.values.insertAt(idx, ...this.maps));
+        await this.provider.insert(...insertions, ...this.values.insertAt(idx, ...this.maps));
     }
 }

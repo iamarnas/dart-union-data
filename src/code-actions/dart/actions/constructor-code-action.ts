@@ -32,15 +32,15 @@ export class ConstructorCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.whereCodeFirstLine((line) => {
+        return this.provider.reader.whereCodeFirstLine((line) => {
             return line.text.indexOf(`${this.element.name}(`) !== -1
                 && !line.text.includesOne('toString()', '=>', 'return', 'factory');
-        }, this.provider.codeLines);
+        }, this.provider.range);
     }
 
     fix(): vscode.CodeAction {
@@ -51,11 +51,11 @@ export class ConstructorCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }

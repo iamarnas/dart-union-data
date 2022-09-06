@@ -26,7 +26,8 @@
 			"request": "launch",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}",
-				"--extensionTestsPath=${workspaceFolder}/out/test/suite/index"
+				"--extensionTestsPath=${workspaceFolder}/out/test/suite/index",
+				"${workspaceFolder}/test-file.dart",
 			],
 			"outFiles": [
 				"${workspaceFolder}/out/test/**/*.js"

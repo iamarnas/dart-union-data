@@ -21,7 +21,7 @@ export class FromMapCodeAction implements CodeActionValue {
     }
 
     private get lines() {
-        return this.provider.rangeToLines(this.range);
+        return this.provider.reader.rangeToLines(this.range);
     }
 
     get items(): FromMapItemCodeAction[] {
@@ -47,7 +47,7 @@ export class FromMapCodeAction implements CodeActionValue {
                 }
             }
 
-            const range = this.provider.linesToRange(...buffer);
+            const range = this.provider.reader.linesToRange(...buffer);
 
             if (range) {
                 ranges.push(range);
@@ -88,9 +88,9 @@ export class FromMapCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.whereCodeFirstLine(
+        return this.provider.reader.whereCodeFirstLine(
             (line) => line.text.includesAll('fromMap(', 'Map<String, dynamic>'),
-            this.provider.codeLines,
+            this.provider.range,
         );
     }
 
@@ -102,11 +102,11 @@ export class FromMapCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
+    async delete(): Promise<void> {
         throw new Error('Method not implemented.');
     }
 }
@@ -126,7 +126,7 @@ class FromMapItemCodeAction implements CodeActionValue {
     }
 
     private get lines(): vscode.TextLine[] {
-        return this.provider.rangeToLines(this.codeRange);
+        return this.provider.reader.rangeToLines(this.codeRange);
     }
 
     private get startLine(): vscode.TextLine | undefined {
@@ -135,7 +135,7 @@ class FromMapItemCodeAction implements CodeActionValue {
 
     private get mapName(): string {
         const regx = /Map<String, dynamic>\s*(\w+)/;
-        return regx.exec(this.provider.lineAt(this.codeRange.start.line).text)?.at(1) ?? 'map';
+        return regx.exec(this.provider.reader.lineAt(this.codeRange.start.line).text)?.at(1) ?? 'map';
     }
 
     private get containsMapName(): boolean {
@@ -158,9 +158,9 @@ class FromMapItemCodeAction implements CodeActionValue {
 
     get position(): vscode.Position {
         const start = this.startLine;
-        const def = this.provider.withinMap(this.codeRange);
+        const defaultPosition = this.provider.withinMap(this.codeRange);
 
-        if (!start) return def.start;
+        if (!start) return defaultPosition;
 
         return new vscode.Position(start.lineNumber, start.firstNonWhitespaceCharacterIndex);
     }
@@ -170,7 +170,7 @@ class FromMapItemCodeAction implements CodeActionValue {
     }
 
     get isUpdated(): boolean {
-        const code = stringLine(this.provider.getTextFromCode(this.codeRange));
+        const code = stringLine(this.provider.getText(this.codeRange));
         const item = stringLine(this.value);
         return code.indexOf(item) !== -1 && this.containsMapName;
     }
@@ -180,10 +180,10 @@ class FromMapItemCodeAction implements CodeActionValue {
         if (!line) return;
 
         if (line.text.includes('(')) {
-            return this.provider.findCodeRange(line.text);
+            return this.provider.reader.findCodeRange(line.text);
         }
 
-        return this.provider.rangeWhere(
+        return this.provider.reader.rangeWhere(
             line.range.start,
             (line) => line.text.trimEnd().endsWith(','),
         );
@@ -197,11 +197,11 @@ class FromMapItemCodeAction implements CodeActionValue {
         );
     }
 
-    update(): void {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }

@@ -1,8 +1,7 @@
 import { AssertionError } from 'assert';
-import { TypeIdentity } from '../interface';
-import { getAbsoluteType, getTypeIdentify as getTypeIdentity, isPrimitive, Parameter } from '../models/parameter';
+import { GenericType, TypeIdentity } from '../interface';
+import { getAbsoluteType, getTypeIdentify, isPrimitive, Parameter } from '../models/parameter';
 import pubspec from '../shared/pubspec';
-import { hasGenericType } from '../templates';
 import '../types/string';
 import { StringBuffer } from '../utils/string-buffer';
 
@@ -158,7 +157,7 @@ class MapEntry {
         }
 
         this.type = getAbsoluteType(param.type);
-        const hasGeneric = hasGenericType(this.type);
+        const hasGeneric = GenericType.isGeneric(this.type);
         const key = hasGeneric
             ? this.type.getRange('<', this.type.indexOf(','), true).trim()
             : 'dynamic';
@@ -187,7 +186,7 @@ class MapEntryProperty {
         this.name = this.type.endsWith('?')
             ? this.type.slice(0, -1)
             : this.type;
-        this.identity = getTypeIdentity(type);
+        this.identity = getTypeIdentify(type);
         this.isPrimitive = isPrimitive(type);
         this.isClassElement = this.identity === 'unknown';
     }

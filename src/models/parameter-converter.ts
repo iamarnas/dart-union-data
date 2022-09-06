@@ -6,7 +6,7 @@ import { Parameter } from './parameter';
  * A class that converts parameters from a given string.
  * - **Note:** `input` must contain a constructor `(...)` to determine parameters range.
  */
-export class ParameterConverter extends DartParameterCodec {
+export class ParameterConverter {
     private constructorRegx = /\((.*)\)/;
     private namedParamsRegx = /\{(.*)\}/;
     private positionalParamsRegx = /\[(.*)\]/;
@@ -15,7 +15,6 @@ export class ParameterConverter extends DartParameterCodec {
 
     /** @param {string} input a string that contains the constructor. */
     constructor(private readonly input: string) {
-        super();
         this.paramsInput = this.constructorRegx.exec(input)?.at(1) ?? '';
     }
 
@@ -80,7 +79,7 @@ export class ParameterConverter extends DartParameterCodec {
         if (params.length === 0) return parameters;
 
         for (const param of params) {
-            const parameter = this.encode(param, 'required');
+            const parameter = DartParameterCodec.encode(param, 'required');
             parameters.push(parameter);
         }
 
@@ -94,7 +93,7 @@ export class ParameterConverter extends DartParameterCodec {
         if (params.length === 0) return parameters;
 
         for (const param of params) {
-            const parameter = this.encode(param, 'named');
+            const parameter = DartParameterCodec.encode(param, 'named');
             parameters.push(parameter);
         }
 
@@ -108,7 +107,7 @@ export class ParameterConverter extends DartParameterCodec {
         if (params.length === 0) return parameters;
 
         for (const param of params) {
-            const parameter = this.encode(param, 'positional');
+            const parameter = DartParameterCodec.encode(param, 'positional');
             parameters.push(parameter);
         }
 

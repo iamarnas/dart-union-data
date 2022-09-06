@@ -27,7 +27,7 @@ export class ToJsonCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange(this.value, this.provider.codeLines);
+        return this.provider.reader.findCodeRange(this.value, this.provider.range);
     }
 
     get insertion(): string {
@@ -37,7 +37,7 @@ export class ToJsonCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
@@ -49,11 +49,11 @@ export class ToJsonCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }

@@ -10,7 +10,13 @@ import { CodeReader } from '../code-reader';
  * A data class that provides the Dart class range from the text document
  * and helps read Dart data in the document.
  */
-export class DartCodeProvider extends CodeReader {
+export class DartCodeProvider {
+
+    /**
+     * The utility class helps read code from the text document.
+     */
+    readonly reader: CodeReader;
+
     /**
      * The current selected text line.
      */
@@ -22,13 +28,17 @@ export class DartCodeProvider extends CodeReader {
     readonly end: vscode.Position;
 
     constructor(public document: vscode.TextDocument, selection: vscode.Range) {
-        super(document);
+        this.reader = new CodeReader(document);
         this.selection = document.lineAt(selection.start.line);
         this.end = this.range?.end ?? document.lineAt(document.lineCount - 1).range.end;
     }
 
     get element(): ClassDataTemplate | undefined {
-        return ElementBuilder.fromString(this.text).build();
+        try {
+            return ElementBuilder.fromString(this.text).build();
+        } catch (error) {
+            console.error(error);
+        }
     }
 
     get data(): DartClassDataProvider | undefined {
@@ -63,40 +73,46 @@ export class DartCodeProvider extends CodeReader {
      * @returns first line position.
      */
     get start() {
-        return this.doc.lineAt(this.range?.start ?? this.selection.range.end);
+        return this.document.lineAt(this.range?.start ?? this.selection.range.end);
     }
 
     /** 
-     * The selected code (Class) range where the current {@link selection} is.
+     * The selected code (Class) range where the current {@link selection} is,
+     * and this range mutates depending on the selection. 
      */
     get range(): vscode.Range | undefined {
-        return this.detectCodeRange(this.selection.range.start, regexp.classMatch);
+        return this.reader.detectCodeRange(this.selection.range.start, {
+            startWhen: (line) => regexp.classMatch.test(line.text),
+            breakWhen: (line) => line.firstNonWhitespaceCharacterIndex === 0
+                && !regexp.classMatch.test(line.text)
+                && !line.isEmptyOrWhitespace,
+        });
     }
 
     /**
      * The method is similar to `document.getText()`,
      * but only searches in the text area of the selected code,
      * the rest of the content will be ignored.
-     * @param range include only the text included in the range
+     * @param range include only the text included in the range.
      * @returns the text inside the provided range or the entire text.
      */
-    getTextFromCode(range?: vscode.Range | undefined): string {
-        const lines = this.codeLines.filter((l) => range && range.contains(l.range));
-        return this.doc.getText(this.linesToRange(...lines));
+    getText(range?: vscode.Range | undefined): string {
+        const lines = this.reader.rangeToLines(this.range).filter((l) => range && range.contains(l.range));
+        return this.document.getText(this.reader.linesToRange(...lines));
     }
 
     /**
      * The text lines of the current code from {@link range}.
      */
-    get codeLines(): vscode.TextLine[] {
-        return this.rangeToLines(this.range);
+    get lines(): vscode.TextLine[] {
+        return this.reader.rangeToLines(this.range);
     }
 
     /**
      * The text of the selected class.
      */
     get text(): string {
-        return this.doc.getText(this.range);
+        return this.document.getText(this.range);
     }
 
     get editor(): vscode.TextEditor | undefined {
@@ -114,7 +130,7 @@ export class DartCodeProvider extends CodeReader {
     /**
      * Checks if text or code is in the selected code.
      */
-    has(text: string) {
+    hasText(text: string) {
         return text.trim()
             .split('\n')
             .map((line) => line.replace(/,$/, '').trim())
@@ -131,27 +147,17 @@ export class DartCodeProvider extends CodeReader {
     }
 
     /**
-     * The range between last map item and last enclosed bracket `)`.
-     * @param code An range of the `Map` method.
+     * The position before enclosed bracket `)` or `}`.
+     * @param within An range of the `Map` method.
      * @returns An range inside the method.
      */
-    withinMap(code: vscode.Range): vscode.Range {
-        const lines = this.rangeToLines(code);
-        const callback = this.whereCodeFirstLine((line) => line.text.includesOne('=>', 'return'), lines);
-        const body = code.with(callback?.start, callback?.end);
-        const line = lines.find((e) => e.text.indexOf('};') !== -1 || e.text.indexOf(');') !== -1);
-        const lastLine = line ?? this.lineAt(body.end.line);
+    withinMap(within: vscode.Range): vscode.Position {
+        const callback = this.reader.whereCodeFirstLine((line) => line.text.includesOne('=>', 'return '), within);
+        const body = within.with(callback?.start, callback?.end);
+        const lastLine = this.document.lineAt(body.end.line);
         const character = lastLine.text.indexOf(';') - 1;
-        const end = lastLine.range.start.with({ character: character });
-        const isOneLineMethod = this.lineAt(body.start.line).text.trimEnd().endsWith(';');
-        const start = isOneLineMethod
-            ? end
-            : lastLine.range.start.with(
-                lastLine.lineNumber - 1,
-                this.lineAt(lastLine.lineNumber - 1).range.end.character,
-            );
-
-        return lastLine.range.with(start, end);
+        const position = lastLine.range.start.with({ character: character });
+        return position;
     }
 
     insertFix(
@@ -189,15 +195,17 @@ export class DartCodeProvider extends CodeReader {
         return fix;
     }
 
-    command(command: vscode.Command): vscode.CodeAction {
+    createCommand(command: vscode.Command, diagnostics?: vscode.Diagnostic[]): vscode.CodeAction {
         const action = new vscode.CodeAction(command.title, vscode.CodeActionKind.QuickFix);
         action.command = command;
+        action.isPreferred = true;
+        action.diagnostics = diagnostics;
         return action;
     }
 
-    replace(...values: CodeActionValueReplace[]) {
+    async replace(...values: CodeActionValueReplace[]) {
         if (!this.editor) return;
-        this.editor.edit((editBuilder) => {
+        await this.editor.edit((editBuilder) => {
             for (const element of values) {
                 if (element.range !== undefined) {
                     editBuilder.replace(element.range, element.value);
@@ -206,18 +214,18 @@ export class DartCodeProvider extends CodeReader {
         });
     }
 
-    insert(...values: CodeActionValueInsert[]) {
+    async insert(...values: CodeActionValueInsert[]) {
         if (!this.editor) return;
-        this.editor.edit((editBuilder) => {
+        await this.editor.edit((editBuilder) => {
             for (const element of values) {
                 editBuilder.insert(element.position, element.insertion);
             }
         });
     }
 
-    delete(...values: CodeActionValueDelete[]) {
+    async delete(...values: CodeActionValueDelete[]) {
         if (!this.editor) return;
-        this.editor.edit((editBuilder) => {
+        await this.editor.edit((editBuilder) => {
             for (const element of values) {
                 if (element.range !== undefined) {
                     editBuilder.delete(element.range);

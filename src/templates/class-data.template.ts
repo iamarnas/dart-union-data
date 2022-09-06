@@ -4,7 +4,8 @@ import {
     ClassElement,
     ConstructorTypes,
     ElementKind,
-    FieldElement
+    FieldElement,
+    GenericType
 } from '../interface';
 import { Parameter } from '../models/parameter';
 import { Settings } from '../models/settings';
@@ -198,16 +199,12 @@ export class ClassDataTemplate implements ClassElement {
     }
 }
 
-function hasGenericType(input: string): boolean {
-    return regexp.genericType.test(input);
-}
-
 /** Returns only the class name and removes the generic type if it is detected. */
 function getClassName(input: string): string {
     const match = /implements|with|mixin|extends/g;
     let name = input;
 
-    if (hasGenericType(name)) {
+    if (GenericType.isGeneric(name)) {
         name = name.replace(regexp.genericType, '');
     }
 

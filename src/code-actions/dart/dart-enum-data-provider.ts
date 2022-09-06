@@ -21,37 +21,43 @@ export class DartEnumDataProvider {
         return this.element.enumMembers.length === 0;
     }
 
-    updateCommand(...args: any[]): vscode.CodeAction {
-        return this.provider.command({
-            command: UPDATE_ENUM_COMMAND,
-            title: 'Update All Changes',
-            tooltip: 'This will update all enum members or extension',
-            arguments: args,
-        });
+    get hasChanges(): boolean {
+        return this.data.hasChanges || this.data.extension.hasChanges;
     }
 
-    updateChanges() {
+    get actions(): vscode.CodeAction[] {
+        if (this.element.isEnhancedEnum) return this.data.actions;
+        return this.data.extension.actions;
+    }
+
+    updateCommand(args: any[], diagnostics?: vscode.Diagnostic[]): vscode.CodeAction {
+        return this.provider.createCommand({
+            command: UPDATE_ENUM_COMMAND,
+            title: 'Update All Changes',
+            tooltip: 'This will update all enum members or enum extension members',
+            arguments: args,
+        },
+            diagnostics,
+        );
+    }
+
+    async updateChanges() {
         const editor = this.provider.editor;
         if (!editor || this.provider.document.languageId !== 'dart') return;
 
-        if (!this.element.isEnhancedEnum && !this.data.extension.isUpdated) {
-            this.data.extension.update();
-            return;
-        }
-
-        editor.edit((builder) => {
-            for (const item of this.data.removals) {
-                builder.delete(this.provider.rangeWithRemarks(item.range));
+        await editor.edit((builder) => {
+            for (const item of this.data.removals.concat(...this.data.extension.removals)) {
+                builder.delete(this.provider.reader.rangeWithRemarks(item.range));
             }
 
-            for (const item of this.data.insertions) {
+            for (const item of this.data.insertions.concat(...this.data.extension.insertions)) {
                 builder.insert(item.position, item.insertion);
             }
 
-            for (const value of this.data.replacements) {
-                const range = value.range;
+            for (const item of this.data.replacements.concat(...this.data.extension.replacements)) {
+                const range = item.range;
                 if (!range) continue;
-                builder.replace(range, value.value);
+                builder.replace(range, item.value);
             }
         });
     }

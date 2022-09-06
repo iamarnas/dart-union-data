@@ -1,8 +1,8 @@
 import { Settings } from '../models/settings';
 import pubspec from '../shared/pubspec';
-import { ClassDataTemplate, hasConstructor, isFactory, isNamedConstructor, isPrivate, ParametersTemplate, SubclassTemplate } from '../templates';
+import { ClassDataTemplate, hasConstructor, ParametersTemplate, SubclassTemplate } from '../templates';
 import { regexp, trim } from '../utils';
-import { ElementKind, FieldElement } from './element';
+import { ConstructorElement, ElementKind, FieldElement } from './element';
 
 const ignoredItems = ['if ', 'while ', 'try ', 'catch ', 'for ', 'do ', 'switch ', 'void ', 'static ', '=> ', 'return '] as const;
 
@@ -86,7 +86,7 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
         const variable = field.replace(match, '').trim();
 
         // Detect constructor...
-        const containsAnyConstructor = isNamedConstructor(field) && field.includes(element.name)
+        const containsAnyConstructor = ConstructorElement.isNamed(field) && field.includes(element.name)
             || field.includes(element.name) && hasConstructor(field);
 
         // Detect class instance variable...
@@ -234,7 +234,7 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
         }
 
         if (containsAnyConstructor) {
-            const isInitialized = isFactory(field)
+            const isInitialized = ConstructorElement.isFactory(field)
                 && (field.includes(' => ') || field.includes('return '));
 
             if (isInitialized) continue;
@@ -338,4 +338,8 @@ function getMultipleValuesFromLine(input: string): string[] {
     const body = `${modifier}${type}${generic}`;
 
     return match[4].split(',').map((e) => `${body}${e.trim()}`);
+}
+
+export function isPrivate(input: string): boolean {
+    return regexp.privacy.test(input);
 }

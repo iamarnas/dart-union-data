@@ -31,12 +31,12 @@ export class ToStringCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getTextFromCode(this.range),
+            this.provider.getText(this.range),
         );
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.findCodeRange('String toString() ', this.provider.codeLines);
+        return this.provider.reader.findCodeRange('String toString() ', this.provider.range);
     }
 
     fix(): vscode.CodeAction {
@@ -47,11 +47,11 @@ export class ToStringCodeAction implements CodeActionValue {
         );
     }
 
-    update() {
-        this.provider.replace(this);
+    async update(): Promise<void> {
+        await this.provider.replace(this);
     }
 
-    delete(): void {
-        this.provider.delete(this);
+    async delete(): Promise<void> {
+        await this.provider.delete(this);
     }
 }

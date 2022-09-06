@@ -6,13 +6,13 @@ import { regexp } from '../utils';
 /**
  * The utility class for reading programing language code syntax from text document.
  */
-export abstract class CodeReader {
+export class CodeReader {
     /**
      * All text lines of the document.
      */
     readonly lines: vscode.TextLine[] = [];
 
-    constructor(protected doc: vscode.TextDocument) {
+    constructor(private doc: vscode.TextDocument) {
         for (let i = 0; i < this.doc.lineCount; i++) {
             const line = this.doc.lineAt(i);
             this.lines.push(line);
@@ -30,7 +30,8 @@ export abstract class CodeReader {
     }
 
     lineAt(line: number | vscode.Position): vscode.TextLine {
-        return this.doc.lineAt(typeof line === 'number' ? line : line.line);
+        if (typeof line === 'number') return this.doc.lineAt(line);
+        return this.doc.lineAt(line.line);
     }
 
     /**
@@ -59,13 +60,6 @@ export abstract class CodeReader {
     }
 
     /**
-     * Get the text from current code.
-     * @param range include only the text included by the range.
-     * @returns the text inside the provided range or the entire text.
-     */
-    abstract getTextFromCode(range?: vscode.Range | undefined): string;
-
-    /**
      * The convenient function to get range union from the text lines
      * @param lines a text lines to calculate range.
      * @returns a range from 0 to the last character number.
@@ -78,19 +72,33 @@ export abstract class CodeReader {
 
     /**
      * Filter text lines by providing matches. All commented lines in the code will be ignored.
-     * @param characters the symbols for searching in the text line.
-     * @param lines text lines to search for range. 
+     * @param match the text or the symbols for searching in the text line or line number.
+     * @param within a range to search for characters. 
      * If lines are undefined will be searched in the document content.
      * @returns a text lines where characters matches. Otherwise empty list.
      */
-    whereTextLine(characters: string[], lines?: vscode.TextLine[]): vscode.TextLine[] {
+    whereTextLine(match: string[] | number, within?: vscode.Range | vscode.TextLine[]): vscode.TextLine[] {
         const buffer: vscode.TextLine[] = [];
-        const textLines = lines ?? this.lines;
+        let textLines = this.lines;
+
+        if (within !== undefined) {
+            if (Array.isArray(within)) {
+                textLines = within;
+            } else {
+                textLines = this.rangeToLines(within);
+            }
+        }
+
+        const index = typeof match === 'number' ? this.lineAt(match).lineNumber : 0;
         const startOfCommnet = regexp.combine(regexp.startOfComment, /^\s*\*/);
-        const isValid = (text: string) => characters.every((e) => text.indexOf(e) !== -1);
+        const isValid = (text: string) => Array.isArray(match)
+            ? match.every((e) => text.indexOf(e) !== -1)
+            : true;
         const isCommet = (text: string) => startOfCommnet.test(text);
 
-        for (const line of textLines) {
+        for (let i = index; i < textLines.length; i++) {
+            const line = textLines[i];
+
             if (isCommet(line.text)) continue;
 
             if (!isCommet(line.text) && isValid(line.text)) {
@@ -106,15 +114,13 @@ export abstract class CodeReader {
      * @param codes a list with codes.
      * @returns the list of the code ranges.
      */
-    whereCodeBlock(codes: string[], lines?: vscode.TextLine[]): vscode.Range[] {
+    whereCodeBlock(codes: string[], within?: vscode.Range): vscode.Range[] {
         const buffer: vscode.Range[] = [];
 
         for (const code of codes) {
-            const codeRange = this.findCodeRange(code, lines);
-
-            if (codeRange) {
-                buffer.push(codeRange);
-            }
+            const range = this.findCodeRange(code, within);
+            if (!range) continue;
+            buffer.push(range);
         }
 
         return buffer;
@@ -133,14 +139,15 @@ export abstract class CodeReader {
     /**
      * Reads code intervals between closing parentheses.
      * The text of the first line must contain method brackets `(` or `{`.
-     * @param text the valid code syntax or function name. Can be first line of the code.
-     * @param lines text lines to search for range. 
-     * If lines are undefined will be searched in the document content.
+     * @param from the valid code syntax or function name. Can be first line of the code.
+     * Or line number.
+     * @param within a range to search for text. 
+     * If within are undefined will be searched in the document content.
      * @returns the code block range.
      */
-    findCodeRange(text: string, lines?: vscode.TextLine[]): vscode.Range | undefined {
-        const split = text.trimStart().split('\n');
-        const start = this.whereTextLine([split[0]], lines)[0];
+    findCodeRange(from: string | number, within?: vscode.Range): vscode.Range | undefined {
+        const match = typeof from === 'string' ? from.trimStart().split('\n') : from;
+        const start = this.whereTextLine(match, within)[0];
 
         if (!start) return;
 
@@ -148,7 +155,7 @@ export abstract class CodeReader {
         const hasParentheses = start.text.indexOf('(') !== -1;
         const openBraket = hasCurly ? '{' : '(';
         const closeBraket = hasCurly ? '}' : ')';
-        const error = `Could not find code from the given first line: ${split[0]}. Check if your code is valid and includes '{}' or '()' brackets.`;
+        const error = `Could not find code from the given first line: ${start.text}. Check if your code is valid and includes '{}' or '()' brackets.`;
         let lastLineNumber = 0, a = 0, b = 0;
 
         if (!hasCurly && !hasParentheses) {
@@ -171,28 +178,31 @@ export abstract class CodeReader {
 
     /**
      * The function read lines down from the predicate to the end of the code.
-     * @param predicate to predict the first line of code.
-     * @param lines a text lines to search for the code. 
-     * If the line is not specified, it will search for lines in the current document.
+     * @param predicate to predict the first line of code or line number.
+     * @param within a range where to search for the code. 
+     * If the range is not specified, it will search for line in the current document.
      * @returns a range of the code.
      */
-    whereCodeFirstLine(predicate: (line: vscode.TextLine) => boolean, lines?: vscode.TextLine[]): vscode.Range | undefined {
-        const textLines = lines ?? this.lines;
-        const line = textLines.find(predicate);
+    whereCodeFirstLine(predicate: (line: vscode.TextLine) => boolean | number, within?: vscode.Range): vscode.Range | undefined {
+        const lines = within ? this.rangeToLines(within) : this.lines;
+        const range = this.linesToRange(...lines);
 
-        if (!line) return;
-
-        return this.findCodeRange(line.text, textLines);
+        for (const line of lines) {
+            if (predicate(line)) {
+                return this.findCodeRange(line.text, range);
+            }
+        }
     }
 
     /**
      * A function that gets the range with the prediction.
-     * @param start the start position of the range or text matching elements
+     * @param start the start position of the range or
+     * text or the symbols for searching in the text. Or line number.
      * @param end the position prediction of the range.
      * @returns a selected range or undefined if end prediction does not occur.
      */
     rangeWhere(
-        start: vscode.Position | string[],
+        start: vscode.Position | string[] | number,
         end: (textLine: vscode.TextLine) => boolean,
     ): vscode.Range | undefined {
 
@@ -205,10 +215,20 @@ export abstract class CodeReader {
                 const line = this.lineAt(i);
                 if (end(line)) return startline.range.with({ end: line.range.end });
             }
-        } else {
+        }
+
+        if (start instanceof vscode.Position) {
             for (let i = start.line; i < this.doc.lineCount; i++) {
                 const line = this.lineAt(i);
                 if (end(line)) return line.range.with(start);
+            }
+        }
+
+        if (typeof start === 'number') {
+            const firstLine = this.lineAt(start);
+            for (let i = firstLine.lineNumber; i < this.doc.lineCount; i++) {
+                const line = this.lineAt(i);
+                if (end(line)) return line.range.with(firstLine.range.start);
             }
         }
     }
@@ -231,14 +251,6 @@ export abstract class CodeReader {
             if (isCodeDependentLine) continue;
 
             if (containAnyCharacter) {
-                // The second line from the top.
-                const secondLine = this.lineAt(line.lineNumber - 1);
-
-                if (secondLine.isEmptyOrWhitespace) {
-                    // Keep the space between the instances.
-                    return range.with({ start: this.lineAt(secondLine.lineNumber - 1).range.end });
-                }
-
                 return range.with({ start: line.range.end });
             }
         }
@@ -247,25 +259,30 @@ export abstract class CodeReader {
     }
 
     /**
-     * A function that reads code to the top from the current position
-     * and if a predicate was found reads code to the end.
-     * @param position current position.
-     * @param predicate is a match to detect the first line of the code.
-     * Code first line must contain closure brackets `{` or `(`.
+     * A function that reads code to the top from the current selected position
+     * and if `startWhen` is `true` reads code to the end.
+     * If `breakWhen` is `true` stops the search.
+     * 
+     * **Note:** code first line must contain closure brackets `{` or `(` 
+     * to be the returned result of search.
+     * @param selection current position.
+     * @param option a option to set start and break lines and change the search range.
      * @returns range of the code. If code was not detected undefined returns.
      */
-    detectCodeRange(position: vscode.Position, predicate: RegExp | string): vscode.Range | undefined {
-        for (let i = position.line; i > -1; i--) {
+    detectCodeRange(
+        selection: vscode.Position,
+        option: {
+            startWhen: (line: vscode.TextLine) => boolean,
+            breakWhen: (line: vscode.TextLine) => boolean,
+            searchIn?: vscode.Range,
+        }): vscode.Range | undefined {
+        for (let i = selection.line; i > -1; i--) {
             const line = this.lines[i];
 
-            if (line.text.startsWith('}')) return;
+            if (option.breakWhen(line)) return;
 
-            if (typeof predicate === 'string' && line.text.indexOf(predicate) !== -1) {
-                return this.findCodeRange(line.text);
-            }
-
-            if (predicate instanceof RegExp && predicate.test(line.text)) {
-                return this.findCodeRange(line.text);
+            if (option.startWhen(line)) {
+                return this.findCodeRange(line.lineNumber, option.searchIn);
             }
         }
     }
