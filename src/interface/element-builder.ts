@@ -4,7 +4,15 @@ import { ClassDataTemplate, hasConstructor, ParametersTemplate, SubclassTemplate
 import { regexp, trim } from '../utils';
 import { ConstructorElement, ElementKind, FieldElement } from './element';
 
-const ignoredItems = ['if ', 'while ', 'try ', 'catch ', 'for ', 'do ', 'switch ', 'void ', 'static ', '=> ', 'return '] as const;
+type FieldBuilderProperties = {
+    jsonKey: string,
+    enums: string[],
+    isEnum: boolean,
+    value: string,
+    field: string,
+};
+
+const ignoredItems = ['if ', 'while ', 'try ', 'catch ', 'for ', 'do ', 'switch ', 'void ', 'static ', '=> ', 'return ', 'import ', 'part '] as const;
 
 export class ElementBuilder {
     constructor(private readonly code: string) { }
@@ -28,6 +36,7 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
         useEquatable: split[0].includes(' Equatable'),
         useAccurateCopyWith: true,
     });
+
     const element = new ClassDataTemplate(split[0], sttings);
 
     // Detect enum...
@@ -76,170 +85,78 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
         const hasEnumComment = regexp.enumComment.test(field);
         const hasJsonKeyAnnotation = regexp.jsonKeyAnnotation.test(field);
         const enumsMatch = regexp.specificEnumComment.exec(field)?.at(1) ?? '';
+        const enumsMembers = enumsMatch.split(',').map(trim).filter(Boolean);
         const jsonKeyComment = regexp.jsonKeyComment.exec(field)?.at(1) ?? '';
         const jsonKeyAnnotation = hasJsonKeyAnnotation ? regexp.jsonKeyName.exec(field)?.at(1) : undefined;
 
         // Field properties...
-        const jsonKey = jsonKeyAnnotation ?? jsonKeyComment;
-        const enums = enumsMatch.split(',').map(trim).filter(Boolean);
-        const isEnum = hasEnumComment || enums.length !== 0;
-        const variable = field.replace(match, '').trim();
+        const properties: FieldBuilderProperties = {
+            jsonKey: jsonKeyAnnotation ?? jsonKeyComment,
+            enums: enumsMembers,
+            isEnum: hasEnumComment || enumsMembers.length !== 0,
+            value: field.replace(match, '').trim(),
+            field: field,
+        };
 
         // Detect constructor...
         const containsAnyConstructor = ConstructorElement.isNamed(field) && field.includes(element.name)
             || field.includes(element.name) && hasConstructor(field);
 
         // Detect class instance variable...
-        const isInstanceVarialble = regexp.primitiveValue.test(variable)
-            || regexp.variableMatch.test(variable);
+        const isInstanceVarialble = regexp.primitiveValue.test(properties.value)
+            || regexp.variableMatch.test(properties.value);
 
         // Detect multi values in one line.
-        const isMultipleValuesInline = regexp.multipleValuesInline.test(variable);
+        const isMultipleValuesInline = regexp.multipleValuesInline.test(properties.value);
 
         // Detect class function variable...
-        const isFuncVariable = regexp.functionType.test(variable);
+        const isFuncVariable = regexp.functionType.test(properties.value);
 
         // Detect getters...
-        const isGetter = regexp.getterMatch.test(variable);
+        const isGetter = regexp.getterMatch.test(properties.value);
 
         if (hasEnumComment) {
-            const match = field.replace(regexp.enumComment, '');
-            const name = match.split(' ').pop() ?? '';
-
-            const fieldElement: FieldElement = {
-                name: name,
-                isConst: false,
-                isPrivate: isPrivate(field),
-                kind: ElementKind.enum,
-                element: {
-                    name: name,
-                    displayName: match,
-                    parameters: ParametersTemplate.from(`(${match})`).asEnum(),
-                }
-            };
-
-            element.addField(fieldElement);
+            const enumFieldElement = createCommentedEnumFieldElement(properties);
+            element.addField(enumFieldElement);
         }
 
         if (isInstanceVarialble) {
-            const parameters = ParametersTemplate.from(`(${variable})`);
-            const param = parameters.all.at(0);
+            const instanceVariableElement = createInstanceVariableFieldElement(properties);
 
-            if (!param) continue;
+            if (instanceVariableElement === undefined) continue;
 
-            const kind = param.identity === 'unknown'
-                ? ElementKind.enum
-                : ElementKind.instanceVariable;
-
-            const copy = param.copyWith({
-                jsonKey: jsonKey,
-                isEnum: kind === ElementKind.enum,
-                enums: enums,
-            });
-
-            const fieldElement: FieldElement = {
-                name: param.name,
-                isConst: false,
-                isPrivate: isPrivate(variable),
-                kind: kind,
-                element: {
-                    name: param.name,
-                    displayName: variable,
-                    parameters: parameters.replaceWith(copy),
-                }
-            };
-
-            element.addField(fieldElement);
+            element.addField(instanceVariableElement);
         }
 
         if (isMultipleValuesInline) {
-            const values = getMultipleValuesFromLine(variable);
-
-            for (const value of values) {
-                const s = value.split(' ');
-                const i = s.indexOf('=');
-                const name = i !== -1 ? s[i - 1] : s.pop() ?? '';
-
-                const fieldElement: FieldElement = {
-                    name: name,
-                    isConst: false,
-                    isPrivate: isPrivate(value),
-                    kind: ElementKind.instanceVariable,
-                    element: {
-                        name: name,
-                        displayName: value,
-                        parameters: ParametersTemplate.from(`(${value})`),
-                    }
-                };
-
-                element.addField(fieldElement);
-            }
+            const elements = createMultipleValueFieldElements(properties);
+            element.addField(...elements);
         }
 
         if (isGetter) {
-            const value = variable.replace('get ', '');
-            const name = variable.split(' ').removeLast() ?? '';
-            const parameters = ParametersTemplate.from(`(${value})`);
-            const param = parameters.all.at(0);
+            const getter = createGetterFieldElement(properties);
 
-            if (!param) continue;
+            if (getter === undefined) continue;
 
-            const copy = param.copyWith({
-                jsonKey: jsonKey,
-                isEnum: isEnum,
-                enums: enums,
-            });
-
-            const fieldElement: FieldElement = {
-                name: name,
-                isConst: false,
-                isPrivate: isPrivate(field),
-                kind: ElementKind.getter,
-                element: {
-                    name: name,
-                    displayName: field,
-                    parameters: parameters.replaceWith(copy),
-                }
-            };
-
-            element.addField(fieldElement);
+            element.addField(getter);
         }
 
         if (isFuncVariable) {
-            const match = regexp.functionType.exec(variable);
-            const parameters = ParametersTemplate.from(`(${match?.[0].trim() ?? ''})`);
-            const param = parameters.all.at(0);
+            const funcFieldElement = createFuncFieldElement(properties);
 
-            if (!param) continue;
+            if (funcFieldElement === undefined) continue;
 
-            const copy = param.copyWith({
-                jsonKey: jsonKey,
-                isEnum: isEnum,
-                enums: enums,
-            });
-
-            const fieldElement: FieldElement = {
-                name: param.name,
-                isConst: false,
-                isPrivate: isPrivate(variable),
-                kind: ElementKind.instanceVariable,
-                element: {
-                    name: param.name,
-                    displayName: variable,
-                    parameters: parameters.replaceWith(copy),
-                }
-            };
-
-            element.addField(fieldElement);
+            element.addField(funcFieldElement);
         }
 
         if (containsAnyConstructor) {
             const isInitialized = ConstructorElement.isFactory(field)
-                && (field.includes(' => ') || field.includes('return '));
+                && (field.includes('=>') || field.includes('return '));
 
             if (isInitialized) continue;
 
             const constructor = new SubclassTemplate(element, field);
+
             element.addConstructor(constructor);
         }
     }
@@ -342,4 +259,138 @@ function getMultipleValuesFromLine(input: string): string[] {
 
 export function isPrivate(input: string): boolean {
     return regexp.privacy.test(input);
+}
+
+function createInstanceVariableFieldElement(properties: FieldBuilderProperties): FieldElement | undefined {
+    const parameters = ParametersTemplate.from(`(${properties.value})`);
+    const param = parameters.all.at(0);
+
+    if (!param) return;
+
+    const kind = param.identity === 'unknown'
+        ? ElementKind.enum
+        : ElementKind.instanceVariable;
+
+    const copy = param.copyWith({
+        jsonKey: properties.jsonKey,
+        isEnum: kind === ElementKind.enum,
+        enums: properties.enums,
+    });
+
+    const fieldElement: FieldElement = {
+        name: param.name,
+        isConst: false,
+        isPrivate: isPrivate(properties.value),
+        kind: kind,
+        element: {
+            name: param.name,
+            displayName: properties.value,
+            parameters: parameters.replaceWith(copy),
+        }
+    };
+
+    return fieldElement;
+}
+
+function createMultipleValueFieldElements(properties: FieldBuilderProperties): FieldElement[] {
+    const result: FieldElement[] = [];
+    const values = getMultipleValuesFromLine(properties.value);
+
+    for (const value of values) {
+        const s = value.split(' ');
+        const i = s.indexOf('=');
+        const name = i !== -1 ? s[i - 1] : s.pop() ?? '';
+
+        const fieldElement: FieldElement = {
+            name: name,
+            isConst: false,
+            isPrivate: isPrivate(value),
+            kind: ElementKind.instanceVariable,
+            element: {
+                name: name,
+                displayName: value,
+                parameters: ParametersTemplate.from(`(${value})`),
+            }
+        };
+
+        result.push(fieldElement);
+    }
+
+    return result;
+}
+
+function createGetterFieldElement(properties: FieldBuilderProperties): FieldElement | undefined {
+    const value = properties.value.replace('get ', '');
+    const name = properties.value.split(' ').removeLast() ?? '';
+    const parameters = ParametersTemplate.from(`(${value})`);
+    const param = parameters.all.at(0);
+
+    if (!param) return;
+
+    const copy = param.copyWith({
+        jsonKey: properties.jsonKey,
+        isEnum: properties.isEnum,
+        enums: properties.enums,
+    });
+
+    const fieldElement: FieldElement = {
+        name: name,
+        isConst: false,
+        isPrivate: isPrivate(properties.field),
+        kind: ElementKind.getter,
+        element: {
+            name: name,
+            displayName: properties.field,
+            parameters: parameters.replaceWith(copy),
+        }
+    };
+
+    return fieldElement;
+}
+
+function createFuncFieldElement(properties: FieldBuilderProperties): FieldElement | undefined {
+    const match = regexp.functionType.exec(properties.value);
+    const parameters = ParametersTemplate.from(`(${match?.[0].trim() ?? ''})`);
+    const param = parameters.all.at(0);
+
+    if (!param) return;
+
+    const copy = param.copyWith({
+        jsonKey: properties.jsonKey,
+        isEnum: properties.isEnum,
+        enums: properties.enums,
+    });
+
+    const fieldElement: FieldElement = {
+        name: param.name,
+        isConst: false,
+        isPrivate: isPrivate(properties.value),
+        kind: ElementKind.instanceVariable,
+        element: {
+            name: param.name,
+            displayName: properties.value,
+            parameters: parameters.replaceWith(copy),
+        }
+    };
+
+    return fieldElement;
+}
+
+function createCommentedEnumFieldElement(properties: FieldBuilderProperties): FieldElement {
+    const match = properties.field.replace(regexp.enumComment, '');
+    const name = match.split(' ').pop() ?? '';
+
+    const fieldElement: FieldElement = {
+        name: name,
+        isConst: false,
+        isPrivate: isPrivate(properties.field),
+        kind: ElementKind.enum,
+        element: {
+            name: name,
+            displayName: match,
+            parameters: ParametersTemplate.from(`(${match})`).asEnum(),
+        }
+    };
+
+    return fieldElement;
 }

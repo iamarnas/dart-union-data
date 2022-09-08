@@ -10,7 +10,6 @@ import {
     ToMapCodeAction,
     ToStringCodeAction
 } from '.';
-import { DartCodeGenerator } from '../../generators';
 import { CodeActionValue, ElementKind } from '../../interface';
 import { ClassDataTemplate } from '../../templates';
 import '../../types/array';
@@ -21,7 +20,6 @@ export const GENERATE_COMMAND = 'generate.class.data';
 export const IMPLEMENT_COPY_WITH_COMMAND = 'implement.copywith';
 
 export class DartClassDataProvider {
-    readonly code: DartCodeGenerator;
     readonly constructorCode: ConstructorCodeAction;
     readonly toString: ToStringCodeAction;
     readonly fromMap: FromMapCodeAction;
@@ -36,7 +34,6 @@ export class DartClassDataProvider {
             console.error('Syntax error due to invalid element type');
         }
 
-        this.code = new DartCodeGenerator(element);
         this.constructorCode = new ConstructorCodeAction(provider, element);
         this.toString = new ToStringCodeAction(provider, element);
         this.fromMap = new FromMapCodeAction(provider, element);

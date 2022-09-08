@@ -190,12 +190,12 @@ export class ClassDataTemplate implements ClassElement {
         return this.name + this.generic.type;
     }
 
-    addField(field: FieldElement) {
-        this.fields.push(field);
+    addField(...field: FieldElement[]) {
+        this.fields.push(...field);
     }
 
-    addConstructor(constructor: SubclassTemplate) {
-        this.constructors.push(constructor);
+    addConstructor(...constructor: SubclassTemplate[]) {
+        this.constructors.push(...constructor);
     }
 }
 

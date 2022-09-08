@@ -25,7 +25,7 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.
         const provider = new DartCodeProvider(document, range);
         const element = provider.element;
 
-        if (!element || !provider.range) return;
+        if (element === undefined) return;
 
         // Obs! The order of the `if` statements in this code is important.
         // Changing positions can lead to false or unnecessary quick-fix predictions.

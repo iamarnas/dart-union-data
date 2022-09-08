@@ -51,12 +51,12 @@ export class ToStringMethodGenerator implements ActionValue {
         return `${this.key} => ${this.value}`;
     }
 
-    private get isOneLine(): boolean {
+    private isOneLine(): boolean {
         return this.lineBody().length < 78;
     }
 
     private method(): string {
-        if (this.isOneLine) return this.lineBody();
+        if (this.isOneLine()) return this.lineBody();
         return this.blockBody();
     }
 }

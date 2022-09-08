@@ -5,12 +5,14 @@ import { CodeActionValueDelete, CodeActionValueInsert, CodeActionValueReplace } 
 import { ClassDataTemplate } from '../../templates';
 import { regexp } from '../../utils';
 import { CodeReader } from '../code-reader';
+import { DartLibraries } from './dart-libraries';
 
 /**
  * A data class that provides the Dart class range from the text document
  * and helps read Dart data in the document.
  */
 export class DartCodeProvider {
+    readonly libraries: DartLibraries;
 
     /**
      * The utility class helps read code from the text document.
@@ -29,11 +31,15 @@ export class DartCodeProvider {
 
     constructor(public document: vscode.TextDocument, selection: vscode.Range) {
         this.reader = new CodeReader(document);
+        this.libraries = new DartLibraries(this.reader);
         this.selection = document.lineAt(selection.start.line);
         this.end = this.range?.end ?? document.lineAt(document.lineCount - 1).range.end;
     }
 
     get element(): ClassDataTemplate | undefined {
+        // Due to safety do not allow create an element if selection not match the class range.
+        if (!this.isSelected) return;
+
         try {
             return ElementBuilder.fromString(this.text).build();
         } catch (error) {
@@ -42,7 +48,7 @@ export class DartCodeProvider {
     }
 
     get data(): DartClassDataProvider | undefined {
-        if (this.element && this.element.kind === ElementKind.class) {
+        if (this.element !== undefined && this.element.kind === ElementKind.class) {
             try {
                 return new DartClassDataProvider(this, this.element);
             } catch (error) {
@@ -52,13 +58,21 @@ export class DartCodeProvider {
     }
 
     get enum(): DartEnumDataProvider | undefined {
-        if (this.element && this.element.kind === ElementKind.enum) {
+        if (this.element !== undefined && this.element.kind === ElementKind.enum) {
             try {
                 return new DartEnumDataProvider(this, this.element);
             } catch (error) {
                 console.error(error);
             }
         }
+    }
+
+    /**
+     * Indicates whether the selection is contained in this class range.
+     * @return `true` if the {@link selection} is inside or equal to this class range.
+     */
+    get isSelected(): boolean {
+        return this.range?.contains(this.selection.range) || false;
     }
 
     /**
