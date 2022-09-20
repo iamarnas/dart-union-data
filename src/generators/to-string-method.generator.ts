@@ -35,6 +35,16 @@ export class ToStringMethodGenerator implements ActionValue {
         return `'${this.className}${this.generic.typeString()}(${params})';`;
     }
 
+    /**
+     * @example 'String toString() => Result<$T>(value: $value, error: $error);'
+     */
+    private lineBody(): string {
+        return `${this.key} => ${this.callbackValue}`;
+    }
+
+    private get isOneLine(): boolean {
+        return this.lineBody().length < 78;
+    }
 
     private blockBody(): string {
         return buildString((sb) => {
@@ -44,19 +54,8 @@ export class ToStringMethodGenerator implements ActionValue {
         });
     }
 
-    /**
-     * @example 'String toString() => Result<$T>(value: $value, error: $error);'
-     */
-    private lineBody(): string {
-        return `${this.key} => ${this.value}`;
-    }
-
-    private isOneLine(): boolean {
-        return this.lineBody().length < 78;
-    }
-
     private method(): string {
-        if (this.isOneLine()) return this.lineBody();
+        if (this.isOneLine) return this.lineBody();
         return this.blockBody();
     }
 }

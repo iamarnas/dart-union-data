@@ -2,72 +2,46 @@
 import * as vscode from 'vscode';
 import { DartCodeProvider } from '..';
 import { MapMethodGenerator } from '../../../generators/map-mehtod.generator';
-import { CodeActionValue } from '../../../interface';
-import { ClassDataTemplate } from '../../../templates';
+import { ActionValue, CodeActionValue } from '../../../interface';
 import '../../../types/array';
-import { stringLine } from '../../../utils';
+import { pairObjects, stringLine } from '../../../utils';
 
 export class FromMapCodeAction implements CodeActionValue {
-    private generator: MapMethodGenerator;
-    value: string;
-
-    constructor(private provider: DartCodeProvider, element: ClassDataTemplate) {
-        this.generator = new MapMethodGenerator(element);
-        this.value = this.generator.writeFromMap().generate();
-    }
+    constructor(private provider: DartCodeProvider, private action: MapMethodGenerator) { }
 
     get key(): string {
-        throw new Error('Method not implemented.');
+        return 'fromMap(';
     }
 
-    private get lines() {
-        return this.provider.reader.rangeToLines(this.range);
+    get value(): string {
+        return this.action.generateFromMap();
     }
 
-    get items(): FromMapItemCodeAction[] {
-        const codeRange = this.range;
-        if (!codeRange) return [];
-        return this.generator.fromMapItems.map((value) => new FromMapItemCodeAction(value, codeRange, this.provider));
+    get items(): CodeActionValue[] {
+        const { range } = this;
+        if (!range) return [];
+        return this.action.fromMapItems.map((value) => new FromMapItemCodeAction(value, range, this.provider));
     }
 
     get generatedItemsRanges(): vscode.Range[] {
-        const ranges: vscode.Range[] = [];
-        let buffer: vscode.TextLine[] = [];
-
-        for (let i = 0; i < this.lines.length; i++) {
-            const line = this.lines[i];
-
-            if (line.text.match(/^\s*.*:\s*.*\[/) !== null) {
-                buffer.push(line);
-            }
-
-            if (line.text.trimEnd().endsWith(',')) {
-                if (!buffer.includes(line)) {
-                    buffer.push(line);
-                }
-            }
-
-            const range = this.provider.reader.linesToRange(...buffer);
-
-            if (range) {
-                ranges.push(range);
-            }
-
-            buffer = [];
-        }
-
-        return ranges;
+        const { range } = this;
+        if (!range) return [];
+        const lines = this.provider.reader.whereTextLine(/^\s*.*:\s*.*\[/, range);
+        if (lines.length === 0) return [];
+        const paired = lines.map(pairObjects);
+        const end = this.provider.withinMap(range);
+        return paired.map(([a, b]) => a.range.with({ end: !b ? end : this.provider.reader.lineAt(b.lineNumber - 1).range.end }));
     }
 
     get removals(): vscode.Range[] {
         return this.generatedItemsRanges.filter((e) => !this.items.some((i) => i.range?.contains(e)));
     }
 
-    get insertions(): FromMapItemCodeAction[] {
+    get insertions(): CodeActionValue[] {
         return this.items.filter((e) => !e.isGenerated);
     }
 
-    get replacements(): FromMapItemCodeAction[] {
+    get replacements(): CodeActionValue[] {
         return this.items.filter((e) => e.isGenerated && !e.isUpdated);
     }
 
@@ -84,7 +58,9 @@ export class FromMapCodeAction implements CodeActionValue {
     }
 
     get isUpdated(): boolean {
-        return this.replacements.length === 0 && this.insertions.length === 0;
+        return this.replacements.length === 0
+            && this.insertions.length === 0
+            && this.removals.length === 0;
     }
 
     get range(): vscode.Range | undefined {
@@ -107,48 +83,28 @@ export class FromMapCodeAction implements CodeActionValue {
     }
 
     async delete(): Promise<void> {
-        throw new Error('Method not implemented.');
+        await this.provider.delete(this);
     }
 }
 
 class FromMapItemCodeAction implements CodeActionValue {
-    private mapNameMatch = /:\s*(.*)\[/;
-    readonly value: string;
-
-    constructor(
-        value: string,
-        private codeRange: vscode.Range,
-        private provider: DartCodeProvider,
-    ) {
-        this.value = this.mapName === 'map'
-            ? value
-            : value.replace(this.mapNameMatch, `: ${this.mapName}[`);
-    }
-
-    private get lines(): vscode.TextLine[] {
-        return this.provider.reader.rangeToLines(this.codeRange);
-    }
-
-    private get startLine(): vscode.TextLine | undefined {
-        return this.lines.find((e) => e.text.trimStart().startsWith(this.key + ':'));
-    }
+    constructor(private action: ActionValue, private codeRange: vscode.Range, private provider: DartCodeProvider) { }
 
     private get mapName(): string {
         const regx = /Map<String, dynamic>\s*(\w+)/;
-        return regx.exec(this.provider.reader.lineAt(this.codeRange.start.line).text)?.at(1) ?? 'map';
+        const { line } = this.codeRange.start;
+        return regx.exec(this.provider.reader.lineAt(line).text)?.at(1) ?? 'map';
     }
 
-    private get containsMapName(): boolean {
-        return this.startLine?.text.indexOf(this.mapName + '[') !== 1;
+    get value(): string {
+        const mapNameMatch = /\w+\[/;
+        if (this.mapName === 'map') return this.action.value;
+        return this.action.value.replace(mapNameMatch, `${this.mapName}[`);
     }
 
-    get isBlockBody(): boolean {
-        return this.codeRange.end.line !== this.position.line + 1;
-    }
-
+    /** @example 'key' */
     get key(): string {
-        const value = this.value.trimStart();
-        return value.slice(0, value.indexOf(':'));
+        return this.action.key;
     }
 
     get insertion(): string {
@@ -162,7 +118,7 @@ class FromMapItemCodeAction implements CodeActionValue {
 
         if (!start) return defaultPosition;
 
-        return new vscode.Position(start.lineNumber, start.firstNonWhitespaceCharacterIndex);
+        return start.range.start.with({ character: start.firstNonWhitespaceCharacterIndex });
     }
 
     get isGenerated(): boolean {
@@ -176,17 +132,36 @@ class FromMapItemCodeAction implements CodeActionValue {
     }
 
     get range(): vscode.Range | undefined {
-        const line = this.startLine;
-        if (!line) return;
+        const lines = this.provider.reader.whereTextLine(/^\s*.*:\s*.*\[/, this.lines);
+        if (lines.length === 0) return;
+        const paired = lines.map(pairObjects);
+        const tuple = paired.find((pair) => pair[0].text.indexOf(this.key) !== -1);
+        if (!tuple) return;
+        const end = this.provider.withinMap(this.codeRange);
 
-        if (line.text.includes('(')) {
-            return this.provider.reader.findCodeRange(line.text);
+        for (const [a, b] of paired) {
+            if (a.range.contains(tuple[0].range)) {
+                const endLine = this.provider.reader.lineAt(b !== undefined ? b.lineNumber - 1 : end);
+                const range = a.range.with({ end: endLine.range.end });
+                return range;
+            }
         }
+    }
 
-        return this.provider.reader.rangeWhere(
-            line.range.start,
-            (line) => line.text.trimEnd().endsWith(','),
-        );
+    private get isBlockBody(): boolean {
+        return !this.provider.reader.lineAt(this.codeRange.start).text.match('=>');
+    }
+
+    private get lines(): vscode.TextLine[] {
+        return this.provider.reader.rangeToLines(this.codeRange);
+    }
+
+    private get startLine(): vscode.TextLine | undefined {
+        return this.lines.find((e) => e.text.match(this.key) !== null);
+    }
+
+    private get containsMapName(): boolean {
+        return this.startLine?.text.indexOf(this.mapName + '[') !== 1;
     }
 
     fix(): vscode.CodeAction {

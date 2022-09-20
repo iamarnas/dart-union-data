@@ -109,7 +109,7 @@ export class StringBuffer implements StringSink {
      * @returns string of tabs.
      */
     private addTabs(tabs = 0): string {
-        return Array.from(Array(tabs)).map(() => '\t').join('');
+        return Array.from({ length: tabs }, () => '\t').join('');
     }
 }
 

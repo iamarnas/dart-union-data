@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { DartCodeProvider } from '..';
+import { DartCodeProvider, MethodCodeAction } from '..';
 import { EnumDataGenerator } from '../../../generators/enum.generator';
 import { ActionValue, CodeActionValue } from '../../../interface';
 import { ClassDataTemplate } from '../../../templates';
@@ -184,64 +184,6 @@ class EnumCheckerCodeAction implements CodeActionValue {
         return this.provider.insertFix(
             this.position,
             'Generate Enum Checker',
-            this.insertion,
-        );
-    }
-
-    async update(): Promise<void> {
-        await this.provider.replace(this);
-    }
-
-    async delete(): Promise<void> {
-        await this.provider.delete(this);
-    }
-}
-
-class MethodCodeAction implements CodeActionValue {
-    constructor(
-        private provider: DartCodeProvider,
-        private action: ActionValue,
-        private within?: vscode.Range,
-    ) { }
-
-    get key(): string {
-        return this.action.key;
-    }
-
-    get value(): string {
-        return this.action.value;
-    }
-
-    get insertion(): string {
-        return this.action.insertion;
-    }
-
-    get position(): vscode.Position {
-        if (this.range) return this.range.start;
-        // Try to get specified code end, otherwise default.
-        return this.within?.end.with({ character: this.within.end.character - 1 }) ?? this.provider.withinCode();
-    }
-
-    get isGenerated(): boolean {
-        return this.range !== undefined;
-    }
-
-    get isUpdated(): boolean {
-        return identicalCode(
-            this.value,
-            this.provider.reader.getText(this.range),
-        );
-    }
-
-    get range(): vscode.Range | undefined {
-        const withinRange = this.within ?? this.provider.range;
-        return this.provider.reader.whereCodeFirstLine((line) => line.text.includes(this.key), withinRange);
-    }
-
-    fix(): vscode.CodeAction {
-        return this.provider.insertFix(
-            this.position,
-            `Generate Method (${this.key.slice(0, -1)})`,
             this.insertion,
         );
     }

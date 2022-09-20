@@ -9,7 +9,7 @@ export class DartLibraries {
     readonly imports: TextLine[] = [];
 
     constructor(reader: CodeReader) {
-        this.initialize(reader);
+        this.read(reader);
     }
 
     get local(): TextLine[] {
@@ -29,7 +29,7 @@ export class DartLibraries {
         return true;
     }
 
-    private initialize(reader: CodeReader) {
+    private read(reader: CodeReader) {
         for (const line of reader.lines) {
             if (line.isEmptyOrWhitespace) continue;
 

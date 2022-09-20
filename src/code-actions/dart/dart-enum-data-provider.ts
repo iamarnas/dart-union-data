@@ -42,7 +42,7 @@ export class DartEnumDataProvider {
     }
 
     async updateChanges() {
-        const editor = this.provider.editor;
+        const { editor } = this.provider;
         if (!editor || this.provider.document.languageId !== 'dart') return;
 
         await editor.edit((builder) => {
@@ -55,7 +55,7 @@ export class DartEnumDataProvider {
             }
 
             for (const item of this.data.replacements.concat(...this.data.extension.replacements)) {
-                const range = item.range;
+                const { range } = item;
                 if (!range) continue;
                 builder.replace(range, item.value);
             }

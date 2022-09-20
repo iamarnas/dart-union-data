@@ -36,11 +36,11 @@ function refreshDiagnostics(doc: vscode.TextDocument, selection: vscode.Range, c
 	}
 
 	for (const provider of [...buffer]) {
-		const enumClass = provider.enum;
+		const enumClass = provider.enumData;
 		const clazz = provider.data;
 
 		if (enumClass !== undefined) {
-			if (provider.enum?.hasChanges ?? false) {
+			if (enumClass.hasChanges ?? false) {
 				const replacements = [
 					...enumClass.data.replacements.map((e) => createEnumMethodDiagnostic(e, enumClass, provider.document)),
 					...enumClass.data.extension.replacements.map((e) => createEnumMethodDiagnostic(e, enumClass, provider.document)),
@@ -52,7 +52,7 @@ function refreshDiagnostics(doc: vscode.TextDocument, selection: vscode.Range, c
 		}
 
 		if (clazz !== undefined) {
-			if (provider.data?.hasChanges ?? false) {
+			if (clazz.hasChanges ?? false) {
 				diagnostics.push(createDataClassDiagnostic(provider));
 			}
 		}
@@ -62,9 +62,10 @@ function refreshDiagnostics(doc: vscode.TextDocument, selection: vscode.Range, c
 }
 
 function createEnumClassDiagnostic(provider: DartCodeProvider): vscode.Diagnostic {
-	const range = provider.start.range;
-	const extensionHasChanges = provider.enum?.data.extension.hasChanges ?? false;
-	const dataHasChanges = provider.enum?.data.hasChanges ?? false;
+	const { range } = provider.start;
+	const { enumData } = provider;
+	const extensionHasChanges = enumData?.data.extension.hasChanges ?? false;
+	const dataHasChanges = enumData?.data.hasChanges ?? false;
 	let name = provider.element?.name ?? '';
 
 	if (dataHasChanges && extensionHasChanges) {
@@ -124,7 +125,7 @@ function createEnumMethodDiagnostic(
 }
 
 function createDataClassDiagnostic(provider: DartCodeProvider): vscode.Diagnostic {
-	const range = provider.start.range;
+	const { range } = provider.start;
 	const name = provider.element ? `${provider.element.name}: ` : '';
 
 	const diagnostic = new vscode.Diagnostic(
@@ -175,18 +176,18 @@ export class DartDiagnosticCodeActionProvider implements vscode.CodeActionProvid
 		token: vscode.CancellationToken,
 	): vscode.CodeAction[] {
 		const provider = new DartCodeProvider(document, range);
-		const enumData = provider.enum;
-		const classData = provider.data;
-		const enumActions = !enumData
-			? []
-			: context.diagnostics
+		const { data, enumData } = provider;
+
+		const enumActions = enumData !== undefined
+			? context.diagnostics
 				.filter((diagnostic) => diagnostic.code === ENUM_MENTION)
-				.map((diagnostic) => enumData.updateCommand([enumData], [diagnostic]));
-		const classDataActions = !classData
-			? []
-			: context.diagnostics
+				.map((diagnostic) => enumData.updateCommand([enumData], [diagnostic]))
+			: [];
+		const classDataActions = data !== undefined
+			? context.diagnostics
 				.filter((diagnostic) => diagnostic.code === CLASS_MENTION)
-				.map((diagnostic) => classData.updateCommand([classData], [diagnostic]));
+				.map((diagnostic) => data.updateCommand([data], [diagnostic]))
+			: [];
 
 		// for each diagnostic entry that has the matching `code`, create a code action command
 		return [...enumActions, ...classDataActions];

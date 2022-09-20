@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { DartCodeProvider } from '..';
 import { MapMethodGenerator } from '../../../generators';
-import { CodeActionValue } from '../../../interface';
+import { ActionValue, CodeActionValue } from '../../../interface';
 import { ClassDataTemplate } from '../../../templates';
 import { stringLine } from '../../../utils';
 
@@ -11,7 +11,7 @@ export class ToMapCodeAction implements CodeActionValue {
 
     constructor(private provider: DartCodeProvider, element: ClassDataTemplate) {
         this.generator = new MapMethodGenerator(element);
-        this.value = this.generator.writeToMap().generate();
+        this.value = this.generator.generateToMap();
     }
 
     get key(): string {
@@ -22,10 +22,10 @@ export class ToMapCodeAction implements CodeActionValue {
         return this.provider.reader.rangeToLines(this.range);
     }
 
-    get items(): ToMapItemCodeAction[] {
+    get items(): CodeActionValue[] {
         const codeRange = this.range;
         if (!codeRange) return [];
-        return this.generator.toMapItems.map((value) => new ToMapItemCodeAction(value, codeRange, this.provider));
+        return this.generator.toMapItems.map((action) => new ToMapItemCodeAction(action, codeRange, this.provider));
     }
 
     get generatedItemsRanges(): vscode.Range[] {
@@ -57,15 +57,15 @@ export class ToMapCodeAction implements CodeActionValue {
         return ranges;
     }
 
-    get removals() {
+    get removals(): vscode.Range[] {
         return this.generatedItemsRanges.filter((e) => !this.items.some((i) => i.range?.contains(e)));
     }
 
-    get insertions(): ToMapItemCodeAction[] {
+    get insertions(): CodeActionValue[] {
         return this.items.filter((e) => !e.isGenerated);
     }
 
-    get replacements(): ToMapItemCodeAction[] {
+    get replacements(): CodeActionValue[] {
         return this.items.filter((e) => e.isGenerated && !e.isUpdated);
     }
 
@@ -110,36 +110,28 @@ export class ToMapCodeAction implements CodeActionValue {
 }
 
 class ToMapItemCodeAction implements CodeActionValue {
-    private mapKeyMatch = /^\s*'(.*)'\s*:/;
-
     constructor(
-        readonly value: string,
+        private action: ActionValue,
         private codeRange: vscode.Range,
         private provider: DartCodeProvider,
     ) { }
 
-    private get lines(): vscode.TextLine[] {
-        return this.provider.reader.rangeToLines(this.codeRange);
+    get value(): string {
+        return this.action.value;
+    }
+
+    /** @example 'key': */
+    get key(): string {
+        return this.action.key;
     }
 
     private get startLine(): vscode.TextLine | undefined {
-        return this.lines.find((e) => this.mapKeyMatch.test(e.text) && e.text.includes(`'${this.key}'`));
-    }
-
-    get key(): string {
-        const value = this.value.trimStart();
-        const name = this.mapKeyMatch.exec(value)?.at(1);
-
-        if (!name) {
-            console.error(`ToMapItemCodeAction.name: failed to read the map key from the value: ${this.value}`);
-            return 'undefined';
-        }
-
-        return name;
+        return this.provider.reader.whereTextLine([this.key], this.codeRange)
+            .find((e) => e.text.match(this.key) !== null);
     }
 
     get isBlockBody(): boolean {
-        return this.codeRange.end.line !== this.position.line + 1;
+        return !this.provider.reader.lineAt(this.codeRange.start).text.match('=>');
     }
 
     get insertion(): string {

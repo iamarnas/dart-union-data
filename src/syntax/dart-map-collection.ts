@@ -3,10 +3,9 @@ import { GenericType, TypeIdentity } from '../interface';
 import { getAbsoluteType, getTypeIdentify, isPrimitive, Parameter } from '../models/parameter';
 import pubspec from '../shared/pubspec';
 import '../types/string';
-import { StringBuffer } from '../utils/string-buffer';
+import { buildString } from '../utils';
 
 export class DartMapCollection {
-    private readonly sb = new StringBuffer();
     readonly entry: MapEntry;
     readonly maybeNull: string;
 
@@ -20,125 +19,123 @@ export class DartMapCollection {
     }
 
     writeObjectElement(): string {
-        this.writeAsMap();
-        this.writeObject();
-        return this.sb.toString();
+        return this.writeAsMap() + this.writeObject();
     }
 
     writeDynamicElement(): string {
-        this.sb.writeln(`${this.param.name}: map['${this.param.mapKey}'] as Map<dynamic, dynamic>${this.maybeNull}`, 4);
+        return buildString((sb) => {
+            sb.writeln(`${this.param.name}: map['${this.param.mapKey}'] as Map<dynamic, dynamic>${this.maybeNull}`, 4);
 
-        if (this.param.hasDefault) {
-            this.sb.write(` ?? ${this.param.defaultValue}`);
-        }
+            if (this.param.hasDefault) {
+                sb.write(` ?? ${this.param.defaultValue}`);
+            }
 
-        this.sb.write(',');
-
-        return this.sb.toString();
+            sb.write(',');
+        });
     }
 
     writeListCollection(): string {
-        this.writeAsListDynamic();
-        this.writeList();
-        return this.sb.toString();
+        return this.writeAsListDynamic() + this.writeList();
     }
 
     writeSetCollection(): string {
-        this.writeAsListDynamic();
-        this.toSet();
-        return this.sb.toString();
+        return this.writeAsListDynamic() + this.toSet();
     }
 
 
-    toSet(option?: { withoutDefault: boolean }) {
-        this.sb.writeln(`${this.maybeNull}.map((e) => (e as ${this.entry.type}).map((k, e) =>`, 6);
-        this.sb.writeln(`${this.entry.mapEntry()}))`, 8);
-        this.sb.writeln('.toSet()', 6);
+    toSet(option?: { withoutDefault: boolean }): string {
+        return buildString((sb) => {
+            sb.writeln(`${this.maybeNull}.map((e) => (e as ${this.entry.type}).map((k, e) =>`, 6);
+            sb.writeln('.toSet()', 6);
 
-        if (this.param.hasDefault && !option?.withoutDefault) {
-            this.sb.write(` ?? ${this.param.defaultValue}`);
-        }
+            if (this.param.hasDefault && !option?.withoutDefault) {
+                sb.write(` ?? ${this.param.defaultValue}`);
+            }
 
-        this.sb.write(',');
+            sb.write(',');
+        });
     }
 
     mapToSet(tab = 0): string {
-        this.sb.writeln(`.map((e) => (e as ${this.entry.type}).map((k, e) =>`, 6 + tab);
-        this.sb.writeln(`${this.entry.mapEntry()}))`, 8 + tab);
-        this.sb.writeln('.toSet())', 6 + tab);
-        return this.sb.toString();
+        return buildString((sb) => {
+            sb.writeln(`.map((e) => (e as ${this.entry.type}).map((k, e) =>`, 6 + tab);
+            sb.writeln(`${this.entry.mapEntry()}))`, 8 + tab);
+            sb.writeln('.toSet())', 6 + tab);
+        });
     }
 
-    private writeAsMap() {
+    private writeAsMap(): string {
         const maybeNull = !this.entry.type.endsWith('?') && this.param.hasDefault ? '?' : '';
-        this.sb.write(`${this.param.name}: (map['${this.param.mapKey}'] as ${this.entry.type}${maybeNull})`, 4);
+        return `\t\t\t\t${this.param.name}: (map['${this.param.mapKey}'] as ${this.entry.type}${maybeNull})`;
     }
 
-    private writeAsListDynamic() {
-        this.sb.writeln(`${this.param.name}: (map['${this.param.mapKey}'] as List<dynamic>${this.maybeNull})`, 4);
+    private writeAsListDynamic(): string {
+        return `\t\t\t\t${this.param.name}: (map['${this.param.mapKey}'] as List<dynamic>${this.maybeNull})`;
     }
 
     private writeObject(): string {
-        this.sb.write(`${this.maybeNull}.map(`);
+        return buildString((sb) => {
+            sb.write(`${this.maybeNull}.map(`);
 
-        if (this.entry.value.isClassElement) {
-            const tabs = this.param.hasDefault ? 7 : 5;
-            this.sb.writeln(`(k, e) => ${this.entry.mapEntry()},`, tabs);
-        } else {
-            this.sb.writeln(`(k, e) => ${this.entry.mapEntry()},`, 5);
-        }
+            if (this.entry.value.isClassElement) {
+                const tabs = this.param.hasDefault ? 7 : 5;
+                sb.writeln(`(k, e) => ${this.entry.mapEntry()},`, tabs);
+            } else {
+                sb.writeln(`(k, e) => ${this.entry.mapEntry()},`, 5);
+            }
 
-        const tabs = this.param.hasDefault ? 6 : 4;
-        this.sb.writeln(')', tabs);
+            const tabs = this.param.hasDefault ? 6 : 4;
+            sb.writeln(')', tabs);
 
-        if (this.param.hasDefault) {
-            this.sb.write(' ??');
-            this.sb.writeln(`${this.param.defaultValue}`, 6);
-        }
+            if (this.param.hasDefault) {
+                sb.write(' ??');
+                sb.writeln(`${this.param.defaultValue}`, 6);
+            }
 
-        this.sb.write(',');
-
-        return this.sb.toString();
+            sb.write(',');
+        });
     }
 
-    private writeList() {
+    private writeList(): string {
         const len = this.param.type.split('<').filter((e) => e === 'List').length;
         const nullCheck = len === 1 ? this.maybeNull : '';
         const from = 4;
 
-        for (let i = 1; i < len; i++) {
-            switch (i) {
-                case 1:
-                    this.sb.writeln(`${this.maybeNull}.map((e) => (e as List<dynamic>)`, from + i * 2);
-                    break;
-                default:
-                    this.sb.writeln('.map((e) => (e as List<dynamic>)', from + i * 2);
+        return buildString((sb) => {
+            for (let i = 1; i < len; i++) {
+                switch (i) {
+                    case 1:
+                        sb.writeln(`${this.maybeNull}.map((e) => (e as List<dynamic>)`, from + i * 2);
+                        break;
+                    default:
+                        sb.writeln('.map((e) => (e as List<dynamic>)', from + i * 2);
+                }
             }
-        }
 
-        if (this.entry.value.isClassElement || this.entry.key.isClassElement) {
-            this.sb.writeln(`${nullCheck}.map((e) => (e as ${this.entry.type}).map(`, from + len * 2);
-            this.sb.writeln(`(k, e) => ${this.entry.mapEntry()}))`, from + 2 + len * 2);
-        } else {
-            const tabs = from + len * 2;
-            this.sb.writeln(`${nullCheck}.map((e) => ${this.entry.type}.from(e as Map))`, tabs);
-        }
-
-        for (let i = len; i > 0; i--) {
-            switch (i) {
-                case 1:
-                    this.sb.writeln('.toList()', from + i * 2);
-
-                    if (this.param.hasDefault) {
-                        this.sb.write(` ?? ${this.param.defaultValue}`);
-                    }
-
-                    this.sb.write(',');
-                    break;
-                default:
-                    this.sb.writeln('.toList())', from + i * 2);
+            if (this.entry.value.isClassElement || this.entry.key.isClassElement) {
+                sb.writeln(`${nullCheck}.map((e) => (e as ${this.entry.type}).map(`, from + len * 2);
+                sb.writeln(`(k, e) => ${this.entry.mapEntry()}))`, from + 2 + len * 2);
+            } else {
+                const tabs = from + len * 2;
+                sb.writeln(`${nullCheck}.map((e) => ${this.entry.type}.from(e as Map))`, tabs);
             }
-        }
+
+            for (let i = len; i > 0; i--) {
+                switch (i) {
+                    case 1:
+                        sb.writeln('.toList()', from + i * 2);
+
+                        if (this.param.hasDefault) {
+                            sb.write(` ?? ${this.param.defaultValue}`);
+                        }
+
+                        sb.write(',');
+                        break;
+                    default:
+                        sb.writeln('.toList())', from + i * 2);
+                }
+            }
+        });
     }
 }
 

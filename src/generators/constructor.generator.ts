@@ -4,36 +4,36 @@ import { ClassDataTemplate, ParametersTemplate, SubclassTemplate } from '../temp
 import '../types/string';
 import { buildString } from '../utils/string-buffer';
 
-export class ConstructorGenerator {
-    private readonly className: string;
-    private sdkVersion: number;
-    generative: GenerativeConstructorGenerator;
-    super: SuperConstructorGenerator;
-
-    constructor(element: SubclassTemplate | ClassDataTemplate) {
-        this.className = element.name;
-        this.sdkVersion = element.settings.sdkVersion;
-        this.generative = new GenerativeConstructorGenerator(element);
-        this.super = new SuperConstructorGenerator(element);
-    }
-}
-
-class GenerativeConstructorGenerator implements ActionValue {
+export class GenerativeConstructorGenerator implements ActionValue {
     readonly className: string;
     private parameters: ParametersTemplate;
+    private formalParameters: ParametersTemplate;
     private sdkVersion: number;
     private isBlock = false;
     private isInitial = false;
-
     constructor(private element: SubclassTemplate | ClassDataTemplate) {
         this.className = element.name;
         this.sdkVersion = element.settings.sdkVersion;
 
         if (element instanceof SubclassTemplate) {
             this.parameters = element.parameters;
+            this.formalParameters = element.superclass.formalPrameters;
         } else {
-            this.parameters = element.instances.asOptionalNamed();
+            this.parameters = element.instances;
+            this.formalParameters = element.formalPrameters;
         }
+    }
+
+    get params(): Parameter[] {
+        return this.parameters.all;
+    }
+
+    get value(): string {
+        return buildString((sb) => {
+            sb.write(this.modifier(), 1);
+            sb.write(`${this.className}`);
+            sb.write(this.localParameters());
+        });
     }
 
     /**
@@ -41,15 +41,7 @@ class GenerativeConstructorGenerator implements ActionValue {
      * @example `const ClassName(` or const `ClassName({`
      */
     get key(): string {
-        return this.value.slice(0, this.value.indexOf('('));
-    }
-
-    get value(): string {
-        return buildString((sb) => {
-            sb.write(this.modifier());
-            sb.write(`${this.className}`);
-            sb.write(this.localParameters());
-        });
+        return this.value.slice(0, this.value.indexOf('(') + 1);
     }
 
     get insertion(): string {
@@ -62,12 +54,18 @@ class GenerativeConstructorGenerator implements ActionValue {
             + this.localParameters().length;
     }
 
-    asBlock(): this {
+    asBlock(option?: { auto: boolean }): this {
+        if (!option) {
+            this.isBlock = this.length < 78;
+            return this;
+        }
+
         this.isBlock = true;
         return this;
     }
 
     asInitial(): this {
+        this.parameters = this.parameters.asOptionalNamed();
         this.isInitial = true;
         return this;
     }
@@ -85,7 +83,7 @@ class GenerativeConstructorGenerator implements ActionValue {
             : isConst ? 'const ' : '';
     }
 
-    private localParameters(): string {
+    localParameters(): string {
         if (this.parameters.isEmpty) return '()';
 
         const required = this.filteredParamsBy((e) => !e.isOptional);
@@ -146,8 +144,42 @@ class GenerativeConstructorGenerator implements ActionValue {
     }
 
     private filteredParamsBy(filter: (param: Parameter) => boolean): string[] {
+        const { all } = this.parameters;
+        const formal = this.formalParameters.all;
+        const initialized = [
+            ...formal.filter((e) => all.some((p) => e.name === p.name)),
+            ...all.filter((e) => !formal.some((p) => e.name === p.name)),
+        ];
+        const filtered = initialized.filter(filter).map((e) => {
+            let sb = '';
+
+            if (!e.isInitialized) {
+                return e.expression('this');
+            }
+
+            if (e.isFinal) {
+                sb = 'final ';
+            }
+
+            if (e.isRequired) {
+                sb = 'required ';
+            }
+
+            if (e.type.startsWith('this.') || e.type.startsWith('super.')) {
+                sb = sb + e.type;
+            } else {
+                sb = sb + `${e.type} ${e.name}`;
+            }
+
+            if (e.hasDefault) {
+                sb = sb + ` = ${e.defaultValue}`;
+            }
+
+            return sb;
+        }).sort((a, b) => Number(b.startsWith('required')) - Number(a.startsWith('required')));
+
         if (this.isInitial) {
-            return this.parameters.all.filter(filter).map((e) => e.expression('this'));
+            return filtered;
         }
 
         if (this.sdkVersion >= 2.17 && !this.isPrivate) {
@@ -167,7 +199,7 @@ class GenerativeConstructorGenerator implements ActionValue {
     }
 }
 
-class SuperConstructorGenerator implements ActionValue {
+export class SuperConstructorGenerator implements ActionValue {
     private parameters: ParametersTemplate;
     private sdkVersion: number;
 
@@ -189,7 +221,7 @@ class SuperConstructorGenerator implements ActionValue {
      * ';'
      */
     get key(): string {
-        return this.value.slice(0, this.value.indexOf('('));
+        return this.value.slice(0, this.value.search('('));
     }
 
     get value(): string {

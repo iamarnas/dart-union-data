@@ -23,72 +23,75 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.
     private dartCodeActions(document: vscode.TextDocument, range: vscode.Range): vscode.CodeAction[] | undefined {
         const actions: vscode.CodeAction[] = [];
         const provider = new DartCodeProvider(document, range);
-        const element = provider.element;
+        const { element, data, enumData } = provider;
 
-        if (element === undefined) return;
+        if (!element) return;
 
         // Obs! The order of the `if` statements in this code is important.
         // Changing positions can lead to false or unnecessary quick-fix predictions.
 
         if (element.kind === ElementKind.enum) {
-            const enumCode = provider.enum;
 
-            if (!enumCode || enumCode.isEmpty) return;
+            if (!enumData || enumData.isEmpty) return;
 
-            console.log(enumCode);
+            console.log(enumData);
 
-            if (enumCode.hasChanges) {
-                actions.push(enumCode.updateCommand([enumCode]));
+            if (enumData.hasChanges) {
+                actions.push(enumData.updateCommand([enumData]));
             }
 
-            return actions.concat(...enumCode.actions);
+            return actions.concat(...enumData.actions);
         }
 
         if (element.kind === ElementKind.class) {
-            const dartCode = provider.data;
 
-            if (!element.hasData || !dartCode) return;
+            if (!element.hasData || !data) return;
 
-            console.log(dartCode);
+            console.log(data);
 
-            if (dartCode.hasNoDataCreated) {
-                actions.push(dartCode.generateCommand(dartCode));
+
+            if (data.hasNoDataCreated) {
+                actions.push(data.generateCommand(data));
             }
 
-            if (dartCode.hasChanges) {
-                actions.push(dartCode.updateCommand(dartCode));
+            if (data.hasChanges) {
+                actions.push(data.updateCommand(data));
             }
 
-            if (!dartCode.constructorCode.isGenerated) {
-                actions.push(dartCode.constructorCode.fix());
+            if (!data.constructorCode.isGenerated) {
+                actions.push(data.constructorCode.fix());
             }
 
-            if (!dartCode.toString.isGenerated) {
-                actions.push(dartCode.toString.fix());
+            if (!data.toString.isGenerated) {
+                actions.push(data.toString.fix());
             }
 
-            if (!dartCode.fromMap.isGenerated) {
-                actions.push(dartCode.fromMap.fix());
+            if (!data.fromMap.isGenerated) {
+                actions.push(data.fromMap.fix());
             }
 
-            if (!dartCode.toMap.isGenerated) {
-                actions.push(dartCode.toMap.fix());
+            if (!data.toMap.isGenerated) {
+                actions.push(data.toMap.fix());
             }
 
-            if (!dartCode.copyWith.method.isGenerated) {
-                actions.push(dartCode.copyWith.method.fix());
+            if (!data.copyWith.method.isGenerated) {
+                actions.push(data.copyWith.method.fix());
             }
 
-            if (dartCode.toMap.isGenerated && !dartCode.toJson.isGenerated) {
-                actions.push(dartCode.toJson.fix());
+            if (data.toMap.isGenerated && !data.toJson.isGenerated) {
+                actions.push(data.toJson.fix());
             }
 
-            if (dartCode.fromMap.isGenerated && !dartCode.fromJson.isGenerated) {
-                actions.push(dartCode.fromJson.fix());
+            if (data.fromMap.isGenerated && !data.fromJson.isGenerated) {
+                actions.push(data.fromJson.fix());
             }
 
-            if (!dartCode.equality.isGenerated) {
-                actions.push(dartCode.equality.fix());
+            if (!data.equality.isGenerated) {
+                actions.push(data.equality.fix());
+            }
+
+            if (data.constructorCode.formaters().length !== 0) {
+                actions.push(data.updateCommand(data));
             }
         }
 

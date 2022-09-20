@@ -26,6 +26,20 @@
             "error",
             "multi-line"
         ],
+        "prefer-destructuring": [
+            "error",
+            {
+                "array": true,
+                "object": true
+            },
+            {
+                "enforceForRenamedProperties": false
+            }
+        ],
+        "template-curly-spacing": [
+            "error",
+            "never"
+        ],
         "eqeqeq": "warn",
         "no-throw-literal": "warn",
         "no-var": "error",

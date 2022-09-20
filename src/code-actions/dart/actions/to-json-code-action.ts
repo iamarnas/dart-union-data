@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { DartCodeProvider } from '..';
-import { DartCodeGenerator } from '../../../generators';
+import { MapMethodGenerator } from '../../../generators';
 import { CodeActionValue } from '../../../interface';
 import { ClassDataTemplate } from '../../../templates';
 import { identicalCode } from '../../../utils';
@@ -14,7 +14,7 @@ export class ToJsonCodeAction implements CodeActionValue {
         element: ClassDataTemplate,
         position?: vscode.Position,
     ) {
-        this.value = new DartCodeGenerator(element).writeToJson().generate();
+        this.value = new MapMethodGenerator(element).generateToJson();
         this.position = position ?? provider.withinCode();
     }
 

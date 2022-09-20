@@ -7,7 +7,6 @@ import {
     FieldElement,
     GenericType
 } from '../interface';
-import { Parameter } from '../models/parameter';
 import { Settings } from '../models/settings';
 import '../types/array';
 import '../types/string';
@@ -41,9 +40,8 @@ export class ClassDataTemplate implements ClassElement {
             // To split them use '+' separator.
             // The split returns two elements `["enum EnumName", "value1, value2, value3"]`.
             const split = this.source.split('+');
-            const name = split[0].slice(start).trim();
-            const members = split[1];
-            this.name = name.capitalize();
+            const [className, members] = split;
+            this.name = className.slice(start).trim().capitalize();
             this.displayName = this.name;
             this.kind = ElementKind.enum;
             this.enumMembers = getEnumMembers(members);
@@ -83,7 +81,7 @@ export class ClassDataTemplate implements ClassElement {
      * A term of the form `this.id` can provide value without type
      * but provide parameters types, value names and default values.
      */
-    private get formalPrameters(): ParametersTemplate {
+    get formalPrameters(): ParametersTemplate {
         if (!this.generativeConstructor) return ParametersTemplate.from('');
         const source = this.generativeConstructor.displayName;
         return ParametersTemplate.from(source).initialize();
@@ -94,29 +92,20 @@ export class ClassDataTemplate implements ClassElement {
      * are based on constructor's {@link formalParameters}.
      */
     get instances(): ParametersTemplate {
-        const parameters: Parameter[] = [];
-        const formalPrameters = this.formalPrameters;
+        const { formalPrameters } = this;
         // Instance variables with unknown initiated param type.
         const instances = this.uninitializedVariables;
         if (formalPrameters.isEmpty) return instances;
         // Combine the missing details from the formal parameters.
         const merged = instances.included(...formalPrameters.all);
-
         // Sort by constructor parameters, it is important for other constructors.
-        for (const variable of merged.all) {
-            if (formalPrameters.has(variable.name)) {
-                parameters.push(variable);
-            }
-        }
-
-        for (const variable of merged.all) {
-            if (!formalPrameters.has(variable.name)) {
-                parameters.push(variable);
-            }
-        }
-
+        const sorted = merged.all.sort((a, b) => {
+            const x = formalPrameters.all.findIndex((e) => e.name === a.name);
+            const y = formalPrameters.all.findIndex((e) => e.name === b.name);
+            return x - y;
+        });
         // Update the buffer so that it matches the super constructor order.
-        return instances.replaceWith(...parameters);
+        return instances.replaceWith(...sorted);
     }
 
     get generativeConstructor(): SubclassTemplate | undefined {

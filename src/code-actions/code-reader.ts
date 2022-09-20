@@ -23,7 +23,6 @@ export class CodeReader {
             if (regexp.classMatch.test(line.text)) {
                 const range = this.findCodeRange(line.lineNumber);
                 if (!range) continue;
-                if (this.classes.get(line)?.isEqual(range) ?? false) continue;
                 this.classes.set(line, range);
             }
         }
@@ -87,38 +86,60 @@ export class CodeReader {
 
     /**
      * Filter text lines by providing matches. All commented lines in the code will be ignored.
-     * @param match the text or the symbols for searching in the text line or line number.
-     * @param within a range to search for characters. 
+     * @param match the text or the symbols for searching in the text line or `RegExp` match.
+     * If match is a `number`, returns the line at this `number` equal to `document.lineAt(number)`.
+     * @param searchIn a range or text lines to search for characters. 
      * If lines are undefined will be searched in the document content.
-     * @returns a text lines where characters matches. Otherwise empty list.
+     * @returns a text lines where match matches. Otherwise empty list.
      */
-    whereTextLine(match: string[] | number, within?: Range | TextLine[]): TextLine[] {
+    whereTextLine(match: string[] | number | RegExp, searchIn?: Range | TextLine[]): TextLine[] {
         const buffer: TextLine[] = [];
         let textLines = this.lines;
 
-        if (within !== undefined) {
-            if (Array.isArray(within)) {
-                textLines = within;
+        if (typeof match === 'number') {
+            return [this.lineAt(match)];
+        }
+
+        if (Array.isArray(searchIn)) {
+            if (searchIn.isEmpty()) {
+                console.error(`Error. It is not possible to search for a '${match}' in the given empty array. Check if the given value is not empty.`);
             } else {
-                textLines = this.rangeToLines(within);
+                textLines = searchIn;
             }
         }
 
-        const index = typeof match === 'number' ? this.lineAt(match).lineNumber : 0;
+        if (searchIn instanceof Range) {
+            textLines = this.rangeToLines(searchIn);
+        }
+
+        const [startLine] = textLines;
+        const lastLine = textLines[textLines.length - 1];
         const startOfCommnet = regexp.combine(regexp.startOfComment, /^\s*\*/);
-        const isValid = (text: string) => Array.isArray(match)
-            ? match.every((e) => text.indexOf(e) !== -1)
-            : true;
+        const isValid = (text: string) => {
+            if (Array.isArray(match)) {
+                return match.every((e) => text.indexOf(e) !== -1);
+            }
+
+            if (match instanceof RegExp) {
+                return match.test(text);
+            }
+
+            // Otherwise, true is returned if match is line number.
+            return true;
+        };
+
         const isCommet = (text: string) => startOfCommnet.test(text);
 
-        for (let i = index; i < textLines.length; i++) {
-            const line = textLines[i];
+        for (let i = startLine.lineNumber; i < this.lines.length; i++) {
+            const line = this.lines[i];
 
             if (isCommet(line.text)) continue;
 
             if (!isCommet(line.text) && isValid(line.text)) {
                 buffer.push(line);
             }
+
+            if (lastLine.lineNumber === i) break;
         }
 
         return buffer;
@@ -129,11 +150,11 @@ export class CodeReader {
      * @param codes a list with codes.
      * @returns the list of the code ranges.
      */
-    whereCodeBlock(codes: string[], within?: Range): Range[] {
+    whereCodeBlock(codes: string[], searchIn?: Range): Range[] {
         const buffer: Range[] = [];
 
         for (const code of codes) {
-            const range = this.findCodeRange(code, within);
+            const range = this.findCodeRange(code, searchIn);
             if (!range) continue;
             buffer.push(range);
         }
@@ -156,13 +177,13 @@ export class CodeReader {
      * The text of the first line must contain method brackets `(` or `{`.
      * @param from the valid code syntax or function name. Can be first line of the code.
      * Or line number.
-     * @param within a range to search for text. 
+     * @param searchIn a range to search for text. 
      * If within are undefined will be searched in the document content.
      * @returns the code block range.
      */
-    findCodeRange(from: string | number, within?: Range): Range | undefined {
+    findCodeRange(from: string | number, searchIn?: Range): Range | undefined {
         const match = typeof from === 'string' ? from.trimStart().split('\n') : from;
-        const start = this.whereTextLine(match, within)[0];
+        const [start] = this.whereTextLine(match, searchIn);
 
         if (!start) return;
 
@@ -194,12 +215,12 @@ export class CodeReader {
     /**
      * The function read lines down from the predicate to the end of the code.
      * @param predicate to predict the first line of code or line number.
-     * @param within a range where to search for the code. 
+     * @param searchIn a range where to search for the code. 
      * If the range is not specified, it will search for line in the current document.
      * @returns a range of the code.
      */
-    whereCodeFirstLine(predicate: (line: TextLine) => boolean | number, within?: Range): Range | undefined {
-        const lines = within ? this.rangeToLines(within) : this.lines;
+    whereCodeFirstLine(predicate: (line: TextLine) => boolean | number, searchIn?: Range): Range | undefined {
+        const lines = searchIn ? this.rangeToLines(searchIn) : this.lines;
         const range = this.linesToRange(...lines);
 
         for (const line of lines) {
@@ -299,5 +320,75 @@ export class CodeReader {
                 return this.findCodeRange(line.lineNumber, option.searchIn);
             }
         }
+    }
+
+    /**
+     * A function that returns a range of the given the word or text.
+     * - Note: the word or text must be in one line.
+     * @param match search element match.
+     * @param searchIn where to look for an range.
+     * @returns range of the specified word or text, otherwise `undefined`.
+     */
+    getWordRange(match: string | RegExp, searchIn?: Range): Range | undefined {
+        const lines = !searchIn ? this.lines : this.rangeToLines(searchIn);
+
+        if (!lines.length) return;
+
+        for (const line of lines) {
+            const text = typeof match === 'string' ? match : match.exec(line.text)?.shift();
+            const character = !text ? -1 : line.text.indexOf(text);
+
+            if (character !== -1 && text !== undefined) {
+                return line.range.with(
+                    line.range.start.with({ character: character }),
+                    line.range.start.with({ character: character + text.length }),
+                );
+            }
+        }
+    }
+
+    /**
+     * A similar function to {@link getWordRange} but returns an array of all matches.
+     * @param match search element match.
+     * @param searchIn where to look for an range.
+     * @returns an array of ranges of the specified words or texts, otherwise the empty array.
+     */
+    getWordRanges(match: string | RegExp, searchIn?: TextLine[] | Range): Range[] {
+        const ranges: Range[] = [];
+        let { lines } = this;
+
+        if (Array.isArray(searchIn)) {
+            lines = searchIn;
+        }
+
+        if (searchIn instanceof Range) {
+            lines = this.rangeToLines(searchIn);
+        }
+
+        for (const line of lines) {
+            if (match instanceof RegExp) {
+                const matches = match.exec(line.text);
+
+                if (!matches) continue;
+
+                for (const m of matches) {
+                    const range = this.getWordRange(m, line.range);
+
+                    if (range !== undefined) {
+                        ranges.push(range);
+                    }
+                }
+            }
+
+            if (typeof match === 'string') {
+                const range = this.getWordRange(match, line.range);
+
+                if (range !== undefined) {
+                    ranges.push(range);
+                }
+            }
+        }
+
+        return ranges;
     }
 }

@@ -32,7 +32,7 @@ export namespace DartParameterCodec {
         const parameter = new Parameter();
         const copy = { ...parameter };
         // Expected split expression 
-        // Example: ['final', 'Map<String, dynamic>', 'json', '=', 'const', '{}'
+        // Example: ['final', 'Map<String, dynamic>', 'json', '=', 'const', '{}']
         const split = analyzeParameterSyntax(input).splitWhere(' ', '<', '>');
 
         if (split.at(0) === 'required') {
@@ -56,6 +56,8 @@ export namespace DartParameterCodec {
                 copy.defaultValue = value;
                 copy.value = value;
             }
+
+            split.splice(split.indexOf('='));
         }
 
         if (split.at(1)?.startsWith('Function')) {

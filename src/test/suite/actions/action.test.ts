@@ -25,25 +25,28 @@ enum Result { loading, error, data }
 
 suite('Enum Code Provider Suite', () => {
     let editor: vscode.TextEditor;
-    let document: vscode.TextDocument;
+    let doc: vscode.TextDocument;
 
     suiteSetup(async () => {
         const editor = vscode.window.activeTextEditor;
 
+
         if (editor) {
+            const { document } = editor;
+
             await editor.edit((editBuilder) => {
                 editBuilder.insert(editor.selection.active, data);
             });
 
-            document = editor.document;
+            doc = document;
         }
     });
 
     describe('enum code action', () => {
         it('should return undefined elements if selection did not contain class', () => {
-            const provider = new DartCodeProvider(document, document.lineAt(0).range);
+            const provider = new DartCodeProvider(doc, doc.lineAt(0).range);
 
-            if (!provider.data || !provider.enum) {
+            if (!provider.data || !provider.enumData) {
                 assert.ok(true);
             } else {
                 assert.ok(false, 'should be all undefined');
@@ -51,7 +54,7 @@ suite('Enum Code Provider Suite', () => {
         });
 
         it('should contain enum first line at index 1', () => {
-            assert.strictEqual(document.lineAt(1).text.includes('enum AppStatus {'), true);
+            assert.strictEqual(doc.lineAt(1).text.includes('enum AppStatus {'), true);
         });
     });
 });

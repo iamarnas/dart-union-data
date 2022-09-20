@@ -57,7 +57,7 @@ export class DartCodeProvider {
         }
     }
 
-    get enum(): DartEnumDataProvider | undefined {
+    get enumData(): DartEnumDataProvider | undefined {
         if (this.element !== undefined && this.element.kind === ElementKind.enum) {
             try {
                 return new DartEnumDataProvider(this, this.element);
@@ -162,16 +162,39 @@ export class DartCodeProvider {
 
     /**
      * The position before enclosed bracket `)` or `}`.
-     * @param within An range of the `Map` method.
-     * @returns An range inside the method.
+     * @param searchIn An range of the `Map` method.
+     * @returns An position inside the method.
      */
-    withinMap(within: vscode.Range): vscode.Position {
-        const callback = this.reader.whereCodeFirstLine((line) => line.text.includesOne('=>', 'return '), within);
-        const body = within.with(callback?.start, callback?.end);
+    withinMap(searchIn: vscode.Range): vscode.Position {
+        const mapCallback = this.reader.whereCodeFirstLine((line) => line.text.includesOne('=>', 'return '), searchIn);
+
+        if (!mapCallback) {
+            console.error(`Error to get return value from the code: ${this.reader.getText(searchIn)}`);
+        }
+
+        const body = searchIn.with(mapCallback?.start, mapCallback?.end);
         const lastLine = this.document.lineAt(body.end.line);
         const character = lastLine.text.indexOf(';') - 1;
-        const position = lastLine.range.start.with({ character: character });
-        return position;
+        const position = lastLine.range.end.with({ character: character });
+        return lastLine.text.indexOf('(') === -1
+            ? this.document.lineAt(body.end.line - 1).range.end
+            : position;
+    }
+
+    /**
+     * The position before enclosed bracket `)` or `}` and `]`.
+     * @param searchIn An range of the constructor body.
+     * @returns An position inside the constructor.
+     */
+    withinConstructor(searchIn: vscode.Range): vscode.Position {
+        const search = /\}\s*\)\s*(;|:)|\]\s*\)\s*(;|:)|\)/;
+        const range = this.reader.getWordRanges(search, searchIn).shift();
+
+        if (!range) {
+            console.error(`Error: No closing parentheses could be found in the specified range: ${this.reader.getText(searchIn)}`);
+        }
+
+        return searchIn.with(range?.start).start;
     }
 
     insertFix(

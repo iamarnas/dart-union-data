@@ -21,10 +21,12 @@ export class Parameter implements ParameterElement {
     readonly isSuper: boolean = false;
     readonly isGetter: boolean = false;
     readonly isEnum: boolean = false;
+
     /**
      * Specifies whether the value is initialized in the constructor.
      */
     readonly isInitialized: boolean = false;
+
     /**
      * A holder for enum types. There can be several types example generic type for map.
      */

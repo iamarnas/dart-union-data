@@ -4,7 +4,7 @@ import { ClassDataTemplate, hasConstructor, ParametersTemplate, SubclassTemplate
 import { regexp, trim } from '../utils';
 import { ConstructorElement, ElementKind, FieldElement } from './element';
 
-type FieldBuilderProperties = {
+type FieldProperties = {
     jsonKey: string,
     enums: string[],
     isEnum: boolean,
@@ -90,7 +90,7 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
         const jsonKeyAnnotation = hasJsonKeyAnnotation ? regexp.jsonKeyName.exec(field)?.at(1) : undefined;
 
         // Field properties...
-        const properties: FieldBuilderProperties = {
+        const properties: FieldProperties = {
             jsonKey: jsonKeyAnnotation ?? jsonKeyComment,
             enums: enumsMembers,
             isEnum: hasEnumComment || enumsMembers.length !== 0,
@@ -249,9 +249,7 @@ function getMultipleValuesFromLine(input: string): string[] {
 
     if (!match) return [];
 
-    const modifier = match[1];
-    const type = match[2];
-    const generic = match[3];
+    const [modifier, type, generic] = match;
     const body = `${modifier}${type}${generic}`;
 
     return match[4].split(',').map((e) => `${body}${e.trim()}`);
@@ -261,7 +259,7 @@ export function isPrivate(input: string): boolean {
     return regexp.privacy.test(input);
 }
 
-function createInstanceVariableFieldElement(properties: FieldBuilderProperties): FieldElement | undefined {
+function createInstanceVariableFieldElement(properties: FieldProperties): FieldElement | undefined {
     const parameters = ParametersTemplate.from(`(${properties.value})`);
     const param = parameters.all.at(0);
 
@@ -292,7 +290,7 @@ function createInstanceVariableFieldElement(properties: FieldBuilderProperties):
     return fieldElement;
 }
 
-function createMultipleValueFieldElements(properties: FieldBuilderProperties): FieldElement[] {
+function createMultipleValueFieldElements(properties: FieldProperties): FieldElement[] {
     const result: FieldElement[] = [];
     const values = getMultipleValuesFromLine(properties.value);
 
@@ -319,7 +317,7 @@ function createMultipleValueFieldElements(properties: FieldBuilderProperties): F
     return result;
 }
 
-function createGetterFieldElement(properties: FieldBuilderProperties): FieldElement | undefined {
+function createGetterFieldElement(properties: FieldProperties): FieldElement | undefined {
     const value = properties.value.replace('get ', '');
     const name = properties.value.split(' ').removeLast() ?? '';
     const parameters = ParametersTemplate.from(`(${value})`);
@@ -348,7 +346,7 @@ function createGetterFieldElement(properties: FieldBuilderProperties): FieldElem
     return fieldElement;
 }
 
-function createFuncFieldElement(properties: FieldBuilderProperties): FieldElement | undefined {
+function createFuncFieldElement(properties: FieldProperties): FieldElement | undefined {
     const match = regexp.functionType.exec(properties.value);
     const parameters = ParametersTemplate.from(`(${match?.[0].trim() ?? ''})`);
     const param = parameters.all.at(0);
@@ -376,7 +374,7 @@ function createFuncFieldElement(properties: FieldBuilderProperties): FieldElemen
     return fieldElement;
 }
 
-function createCommentedEnumFieldElement(properties: FieldBuilderProperties): FieldElement {
+function createCommentedEnumFieldElement(properties: FieldProperties): FieldElement {
     const match = properties.field.replace(regexp.enumComment, '');
     const name = match.split(' ').pop() ?? '';
 

@@ -3,7 +3,6 @@ import { ConstructorTypes } from '../interface/element';
 import { ClassDataTemplate, SubclassTemplate } from '../templates';
 import '../types/string';
 import { StringBuffer } from '../utils/string-buffer';
-import { MapMethodGenerator } from './map-mehtod.generator';
 
 /** 
  * The data class which is the base generator that provides and sorts other generator classes.
@@ -39,36 +38,6 @@ export class DartCodeGenerator {
 
     writeAsOrNullCheckers(): this {
         this.writeAsOrNullChecker();
-        return this;
-    }
-
-    writeFromMap(): this {
-        const generator = new MapMethodGenerator(this.element);
-        this.sb.write(generator.writeFromMap().generate());
-        return this;
-    }
-
-    writeToMap(): this {
-        const generator = new MapMethodGenerator(this.element);
-        this.sb.write(generator.writeToMap().generate());
-        return this;
-    }
-
-    writeJsonCodecs(): this {
-        const generator = new MapMethodGenerator(this.element);
-        this.sb.write(generator.writeJsonCodecs().generate());
-        return this;
-    }
-
-    writeToJson(): this {
-        const generator = new MapMethodGenerator(this.element);
-        this.sb.write(generator.writeToJson().generate());
-        return this;
-    }
-
-    writeFromJson(): this {
-        const generator = new MapMethodGenerator(this.element);
-        this.sb.write(generator.writeFromJson().generate());
         return this;
     }
 

@@ -3,23 +3,29 @@ import { DartCodeProvider } from '..';
 import { ActionValue, CodeActionValue } from '../../../interface';
 import { identicalCode } from '../../../utils';
 
-export class ToStringCodeAction implements CodeActionValue {
-    constructor(private provider: DartCodeProvider, private action: ActionValue) { }
-
-    get value(): string {
-        return '\t' + this.action.value;
-    }
+export class MethodCodeAction implements CodeActionValue {
+    constructor(
+        private provider: DartCodeProvider,
+        private action: ActionValue,
+        private searchIn?: vscode.Range,
+    ) { }
 
     get key(): string {
         return this.action.key;
     }
 
+    get value(): string {
+        return this.action.value;
+    }
+
     get insertion(): string {
-        return '\n\t@override\n' + this.value + '\n';
+        return this.action.insertion;
     }
 
     get position(): vscode.Position {
-        return this.provider.withinCode();
+        if (this.range) return this.range.start;
+        // Try to get specified code end, otherwise default.
+        return this.searchIn?.end.with({ character: this.searchIn.end.character - 1 }) ?? this.provider.withinCode();
     }
 
     get isGenerated(): boolean {
@@ -29,18 +35,19 @@ export class ToStringCodeAction implements CodeActionValue {
     get isUpdated(): boolean {
         return identicalCode(
             this.value,
-            this.provider.getText(this.range),
+            this.provider.reader.getText(this.range),
         );
     }
 
     get range(): vscode.Range | undefined {
-        return this.provider.reader.findCodeRange(this.key, this.provider.range);
+        const withinRange = this.searchIn ?? this.provider.range;
+        return this.provider.reader.whereCodeFirstLine((line) => line.text.includes(this.key), withinRange);
     }
 
     fix(): vscode.CodeAction {
         return this.provider.insertFix(
             this.position,
-            'Generate to String Method',
+            `Generate Method (${this.key.slice(0, -1)})`,
             this.insertion,
         );
     }

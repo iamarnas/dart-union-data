@@ -5,11 +5,11 @@ import {
     DartCodeProvider,
     EqualityCodeAction,
     FromJsonCodeAction,
-    FromMapCodeAction,
-    ToJsonCodeAction,
+    FromMapCodeAction, ToJsonCodeAction,
     ToMapCodeAction,
     ToStringCodeAction
 } from '.';
+import { MapMethodGenerator, ToStringMethodGenerator } from '../../generators';
 import { CodeActionValue, ElementKind } from '../../interface';
 import { ClassDataTemplate } from '../../templates';
 import '../../types/array';
@@ -35,31 +35,18 @@ export class DartClassDataProvider {
         }
 
         this.constructorCode = new ConstructorCodeAction(provider, element);
-        this.toString = new ToStringCodeAction(provider, element);
-        this.fromMap = new FromMapCodeAction(provider, element);
+        this.toString = new ToStringCodeAction(provider, new ToStringMethodGenerator(element));
+        this.fromMap = new FromMapCodeAction(provider, new MapMethodGenerator(element));
         this.toMap = new ToMapCodeAction(provider, element);
-        this.fromJson = new FromJsonCodeAction(provider, element);
-        this.toJson = new ToJsonCodeAction(provider, element);
+        this.fromJson = new FromJsonCodeAction(provider, element, this.fromMap.range?.end);
+        this.toJson = new ToJsonCodeAction(provider, element, this.toMap.range?.end);
         this.equality = new EqualityCodeAction(provider, element);
         this.copyWith = new CopyWithCodeAction(provider, element);
 
-        // Update the position to insert `fromJson` below the `fromMap`.
-        if (this.fromMap.range !== undefined) {
-            this.fromJson = new FromJsonCodeAction(
-                provider,
-                element,
-                new vscode.Position(this.fromMap.range.end.line + 1, 0),
-            );
-        }
 
-        // Update the position to insert `toJson` below the `toMap`.
-        if (this.toMap.range !== undefined) {
-            this.toJson = new ToJsonCodeAction(
-                provider,
-                element,
-                new vscode.Position(this.toMap.range.end.line + 1, 0),
-            );
-        }
+        // for (const item of this.constructorCode.generative.items) {
+        //     console.log(item.value, item.isGenerated, item.isUpdated);
+        // }
     }
 
     get hasConvertImport(): boolean {
@@ -83,14 +70,13 @@ export class DartClassDataProvider {
     get values() {
         const values: CodeActionValue[] = [
             this.constructorCode,
-            this.toString,
-            this.toJson,
-            this.fromJson,
-            ...this.copyWith.items,
-            // The map items for more accurate changes to avoid deleting comments.
+            // this.toString,
+            // this.toJson,
+            //this.fromJson,
+            //...this.copyWith.items,
             ...this.fromMap.replacements,
-            ...this.toMap.replacements,
-            ...this.equality.items,
+            // ...this.toMap.replacements,
+            // ...this.equality.items,
         ];
 
         // if (this.copyWith.useAccurateCopyWith) {
@@ -136,32 +122,36 @@ export class DartClassDataProvider {
     }
 
     async updateChanges() {
-        const editor = this.provider.editor;
+        const { editor } = this.provider;
         if (!editor || this.provider.document.languageId !== 'dart') return;
 
         const removalsRanges = [...this.fromMap.removals, ...this.toMap.removals];
         const insertionsItems = [...this.fromMap.insertions, ...this.toMap.insertions];
 
         await editor.edit((builder) => {
-            if (this.equality.equatable.isGenerated && !this.equality.useEquatable) {
-                const equatableRange = this.equality.equatable.range;
-                if (equatableRange) {
-                    removalsRanges.push(this.provider.reader.rangeWithRemarks(equatableRange));
-                }
-            }
+            // if (this.equality.equatable.isGenerated && !this.equality.useEquatable) {
+            //     const equatableRange = this.equality.equatable.range;
+            //     if (equatableRange) {
+            //         removalsRanges.push(this.provider.reader.rangeWithRemarks(equatableRange));
+            //     }
+            // }
 
-            for (const range of removalsRanges) {
-                builder.delete(this.provider.reader.rangeWithRemarks(range));
-            }
+            // for (const range of removalsRanges) {
+            //     builder.delete(this.provider.reader.rangeWithRemarks(range));
+            // }
 
-            for (const item of insertionsItems) {
-                builder.insert(item.position, item.insertion);
-            }
+            // for (const { position, insertion } of insertionsItems) {
+            //     builder.insert(position, insertion);
+            // }
 
-            for (const value of this.values) {
-                const range = value.range;
+            // for (const { value, range } of this.values) {
+            //     if (!range) continue;
+            //     builder.replace(range, value);
+            // }
+
+            for (const { value, range } of this.constructorCode.formaters()) {
                 if (!range) continue;
-                builder.replace(range, value.value);
+                builder.replace(range, value);
             }
         });
     }
