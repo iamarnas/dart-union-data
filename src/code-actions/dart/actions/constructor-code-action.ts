@@ -67,7 +67,8 @@ export class ConstructorCodeAction implements MultiCodeActionValue {
         const [first, second] = lines;
         const tuples = lines.map(pairObjects);
 
-        if (first.text.trimEnd().endsWith('(') || first.text.trimEnd().endsWith(',') && second.text.trimEnd().endsWith(';')) {
+        if (first.text.trimEnd().endsWith('(') || first.text.trimEnd().endsWith(',')
+            && !this.provider.document.getText(items[items.length - 1].range).endsWith(',')) {
             tuples.forEach(([a, b]) => {
                 if (b !== undefined) {
                     result.push({

@@ -349,12 +349,16 @@ export class CodeReader {
 
     /**
      * A similar function to {@link getWordRange} but returns an array of all matches.
-     * @param match search element match.
+     * - Note: `string` must contains backslash before repetition character ex: \\\\+
+     * @param match search element match. RegExp must be global.
      * @param searchIn where to look for an range.
      * @returns an array of ranges of the specified words or texts, otherwise the empty array.
      */
     getWordRanges(match: string | RegExp, searchIn?: TextLine[] | Range): Range[] {
         const ranges: Range[] = [];
+        const regx = typeof match === 'string'
+            ? new RegExp(match, 'g')
+            : match;
         let { lines } = this;
 
         if (Array.isArray(searchIn)) {
@@ -365,26 +369,22 @@ export class CodeReader {
             lines = this.rangeToLines(searchIn);
         }
 
+        if (!regx.global) {
+            console.error(`Error: returned empty array due to '${match}' is not a global`);
+            return [];
+        }
+
         for (const line of lines) {
-            if (match instanceof RegExp) {
-                const matches = match.exec(line.text);
+            const matches = line.text.matchAll(regx);
 
-                if (!matches) continue;
+            for (const m of Array.from(matches)) {
+                const { index } = m;
 
-                for (const m of matches) {
-                    const range = this.getWordRange(m, line.range);
-
-                    if (range !== undefined) {
-                        ranges.push(range);
-                    }
-                }
-            }
-
-            if (typeof match === 'string') {
-                const range = this.getWordRange(match, line.range);
-
-                if (range !== undefined) {
-                    ranges.push(range);
+                if (index !== undefined) {
+                    ranges.push(line.range.with(
+                        line.range.start.with({ character: index }),
+                        line.range.end.with({ character: index + m[0].length }),
+                    ));
                 }
             }
         }
