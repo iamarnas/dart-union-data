@@ -4,7 +4,7 @@ import { ElementBuilder, ElementKind } from '../../interface';
 import { CodeActionValueDelete, CodeActionValueInsert, CodeActionValueReplace } from '../../interface/action';
 import { ClassDataTemplate } from '../../templates';
 import { regexp } from '../../utils';
-import { CodeReader } from '../code-reader';
+import { CodeReader } from '../../utils/code-reader';
 import { DartLibraries } from './dart-libraries';
 
 /**
@@ -27,13 +27,13 @@ export class DartCodeProvider {
     /**
      * The end position of the code or end position of the document if the code is not found.
      */
-    readonly end: vscode.Position;
+    readonly end: vscode.TextLine;
 
     constructor(public document: vscode.TextDocument, selection: vscode.Range) {
         this.reader = new CodeReader(document);
         this.libraries = new DartLibraries(this.reader);
         this.selection = document.lineAt(selection.start.line);
-        this.end = this.range?.end ?? document.lineAt(document.lineCount - 1).range.end;
+        this.end = !this.range ? document.lineAt(document.lineCount - 1) : document.lineAt(this.range.end);
     }
 
     get element(): ClassDataTemplate | undefined {
@@ -157,7 +157,8 @@ export class DartCodeProvider {
      * @returns end position inside the code.
      */
     withinCode() {
-        return this.end.with({ character: this.end.character - 1 });
+        const character = this.end.text.match('}')?.index;
+        return this.end.range.end.with({ character: character ?? 0 });
     }
 
     /**
@@ -174,7 +175,7 @@ export class DartCodeProvider {
 
         const body = searchIn.with(mapCallback?.start, mapCallback?.end);
         const lastLine = this.document.lineAt(body.end.line);
-        const character = lastLine.text.indexOf(';') - 1;
+        const character = lastLine.text.match(';')?.index;
         const position = lastLine.range.end.with({ character: character });
         return lastLine.text.indexOf('(') === -1
             ? this.document.lineAt(body.end.line - 1).range.end
@@ -187,14 +188,31 @@ export class DartCodeProvider {
      * @returns An position inside the constructor.
      */
     withinConstructor(searchIn: vscode.Range): vscode.Position {
-        const search = /\}\s*\)\s*(;|:)|\]\s*\)\s*(;|:)|\)/;
-        const range = this.reader.getWordRanges(search, searchIn).shift();
+        const endMatch = /(?<=[\]},\w\d'"])(\s*]\)|\s*}\)|\s*\))\s*(;|:|\s*$)/;
+
+        const range = this.reader.rangeWhere(
+            searchIn.start.line,
+            (line) => line.text.search(/;|:/) !== -1 || line.text.trimEnd().endsWith(')'),
+        );
 
         if (!range) {
-            console.error(`Error: No closing parentheses could be found in the specified range: ${this.reader.getText(searchIn)}`);
+            console.error(`Error: Could not find the end of the constructor in the given text, text: ${this.document.getText(searchIn)}`);
+            return searchIn.end;
         }
 
-        return searchIn.with(range?.start).start;
+        const lineBefore = this.document.lineAt(range.end.line);
+
+        if (lineBefore.text.trimEnd().endsWith(',')) {
+            return lineBefore.range.end;
+        }
+
+        const character = this.document.lineAt(range.end.line).text.indexesOf(endMatch).at(0)?.at(0);
+
+        if (character !== undefined) {
+            return range.end.with({ character: character });
+        }
+
+        return range.end;
     }
 
     insertFix(

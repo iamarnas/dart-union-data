@@ -1,20 +1,20 @@
 import * as vscode from 'vscode';
 import { DartCodeProvider } from '..';
 import { GenerativeConstructorGenerator, SuperConstructorGenerator } from '../../../generators';
-import { CodeActionValue, CodeActionValueReplace, MultiCodeActionValue } from '../../../interface';
+import { CodeActionValue } from '../../../interface';
 import { ClassDataTemplate, SubclassTemplate } from '../../../templates';
 import '../../../types/string';
-import { identicalCode, pairObjects } from '../../../utils';
+import { identicalCode } from '../../../utils';
 
-export class ConstructorCodeAction implements MultiCodeActionValue {
+export class ConstructorCodeAction implements CodeActionValue {
     readonly generative: GenerativeConstructorCodeAction;
     readonly super: SuperConstructorCodeAction | undefined;
 
     constructor(private provider: DartCodeProvider, element: SubclassTemplate | ClassDataTemplate) {
         this.generative = new GenerativeConstructorCodeAction(provider, new GenerativeConstructorGenerator(element));
 
-        if (this.generative.range?.end) {
-            this.super = new SuperConstructorCodeAction(provider, new SuperConstructorGenerator(element), this.generative.range?.end);
+        if (this.generative.range !== undefined) {
+            this.super = new SuperConstructorCodeAction(provider, new SuperConstructorGenerator(element), this.generative.range.end);
         }
     }
 
@@ -29,14 +29,14 @@ export class ConstructorCodeAction implements MultiCodeActionValue {
     }
 
     get value(): string {
-        return !this.super
+        return !this.super?.isGenerated
             ? this.generative.value
             : this.generative.value + this.super.value;
     }
 
     get insertion(): string {
-        return !this.super
-            ? this.generative.insertion.trimEnd() + ';'
+        return !this.super?.isGenerated
+            ? this.generative.insertion
             : this.generative.insertion + this.super.insertion;
     }
 
@@ -45,71 +45,25 @@ export class ConstructorCodeAction implements MultiCodeActionValue {
     }
 
     get isGenerated(): boolean {
-        return this.super?.isGenerated !== undefined
+        return this.super?.isGenerated
             ? this.super.isGenerated && this.generative.isGenerated
             : this.generative.isGenerated;
     }
 
     get isUpdated(): boolean {
-        return this.super?.isUpdated !== undefined
-            ? this.super.isUpdated && this.generative.isUpdated
-            : this.generative.isUpdated;
+        return this.generative.isUpdated;
     }
 
     get range(): vscode.Range | undefined {
         return this.generative.range?.with({ end: this.super?.range?.end });
     }
 
-    formaters(): CodeActionValueReplace[] {
-        const result: CodeActionValueReplace[] = [];
-        const { lines, items } = this.generative;
-        if (lines.length < 2 || !items.length) return [];
-        const [first, second] = lines;
-        const tuples = lines.map(pairObjects);
-
-        if (first.text.trimEnd().endsWith('(') || first.text.trimEnd().endsWith(',')
-            && !this.provider.document.getText(items[items.length - 1].range).endsWith(',')) {
-            tuples.forEach(([a, b]) => {
-                if (b !== undefined) {
-                    result.push({
-                        range: new vscode.Range(a.range.end, b.range.start.with({ character: b.firstNonWhitespaceCharacterIndex })),
-                        value: '',
-                    });
-                }
-            });
-
-            items.forEach((item, i) => {
-                const { range, position } = item;
-
-                if (range !== undefined) {
-                    result.push({
-                        range: new vscode.Range(position, position),
-                        value: '\n\t\t',
-                    });
-
-                    if (i === items.length - 1 && !this.provider.document.getText(item.range).endsWith(',')) {
-                        result.push({
-                            range: new vscode.Range(range.end, range.end),
-                            value: ',\n\t',
-                        });
-                    }
-                }
-            });
-        }
-
-        return result;
+    get replacements(): CodeActionValue[] {
+        return [];
     }
 
-    insertions(): CodeActionValue[] {
-        throw new Error('Method not implemented.');
-    }
-
-    replacements(): CodeActionValue[] {
-        throw new Error('Method not implemented.');
-    }
-
-    removals(): vscode.Range[] {
-        throw new Error('Method not implemented.');
+    get isBlockBody(): boolean {
+        return this.provider.reader.rangeToLines(this.range).some((e) => e.text.trimEnd().endsWith(','));
     }
 
     fix(): vscode.CodeAction {
@@ -137,13 +91,15 @@ class GenerativeConstructorCodeAction implements CodeActionValue {
     }
 
     get value(): string {
-        return this.action.asBlock({ auto: true }).asInitial().value;
+        const initial = this.action.asBlock({ auto: true }).asInitial().value;
+        if (!this.range) return initial;
+        const current = this.action.refactor(this.provider.document.getText(this.range)).value;
+        return current.endsWith('()') ? initial : current;
     }
 
     get insertion(): string {
-        const insertion = this.action.asBlock({ auto: true }).asInitial().value;
         const space = this.provider.start.isEmptyOrWhitespace ? '' : '\n';
-        return '\n' + insertion + space;
+        return '\n' + this.value + space;
     }
 
     get position(): vscode.Position {
@@ -155,17 +111,17 @@ class GenerativeConstructorCodeAction implements CodeActionValue {
     }
 
     get isUpdated(): boolean {
-        // Generated parameters.
-        const a = extractConstructorParameters(this.value);
-        // Unknown and probably modified parameters or bad formated.
-        const b = extractConstructorParameters(this.provider.getText(this.range));
-        return a.every((e) => b.includes(e)) && a.length === b.length;
+        if (!this.range) return false;
+        const parmas = this.action.refactor(this.provider.document.getText(this.range)).parameters;
+        const formal = this.provider.element?.formalPrameters.all ?? [];
+        //return parmas.length === formal?.length && formal?.every((p) => parmas?.some((e) => p.maybeGenerated(e)));
+        return false;
     }
 
     get range(): vscode.Range | undefined {
         // This range can be with super constructor.
         const fullRange = this.provider.reader.whereCodeFirstLine((line) => {
-            return line.text.indexOf(this.key) !== -1
+            return line.text.search(this.key.pattern()) !== -1
                 && !line.text.includesOne('toString()', '=>', 'return', 'factory');
         }, this.provider.range);
 
@@ -183,17 +139,6 @@ class GenerativeConstructorCodeAction implements CodeActionValue {
         const character = lastLine.text.search(/\s*;|\s*:|\)\s*;|\)\s*:/);
         // Separated by super constructor.
         return range.with({ end: lastLine.range.end.with({ character: character + 1 }) });
-    }
-
-    get items(): CodeActionValue[] {
-        const { range } = this;
-        if (!range) return [];
-        const params = extractConstructorParameters(this.provider.document.getText(range));
-        return params.map((param) => new ConstructorParameterCodeAction(this.provider, param, range));
-    }
-
-    get lines(): vscode.TextLine[] {
-        return this.provider.reader.rangeToLines(this.range);
     }
 
     fix(): vscode.CodeAction {
@@ -260,72 +205,4 @@ class SuperConstructorCodeAction implements CodeActionValue {
     async delete(): Promise<void> {
         await this.provider.delete(this);
     }
-}
-
-class ConstructorParameterCodeAction implements CodeActionValue {
-    constructor(private provider: DartCodeProvider, private parameter: string, private constructorRange: vscode.Range) { }
-
-    get key(): string {
-        return this.parameter;
-    }
-
-    get value(): string {
-        return this.parameter;
-    }
-
-    get insertion(): string {
-        return '\n' + this.value + '\n';
-    }
-
-    get position(): vscode.Position {
-        if (this.range !== undefined) return this.range.start;
-        return this.provider.withinConstructor(this.constructorRange);
-    }
-
-    get isGenerated(): boolean {
-        return this.range !== undefined;
-    }
-
-    get isUpdated(): boolean {
-        const fields = this.provider.element?.fields;
-        if (!fields) return false;
-        return fields.some((e) => this.key.indexOf(e.element.name) !== -1);
-    }
-
-    get range(): vscode.Range | undefined {
-        const range = this.provider.reader.getWordRange(this.key, this.constructorRange);
-        if (!range) return;
-        // Include the comma to the parameter range.
-        const character = this.provider.reader.lineAt(range.start).text.indexOf(',', range.start.character);
-        return character !== -1
-            ? range.with({ end: range.end.with({ character: character + 1 }) })
-            : range;
-    }
-
-    fix(): vscode.CodeAction {
-        return this.provider.insertFix(
-            this.position,
-            'Generate Parameter',
-            this.insertion,
-        );
-    }
-
-    async update(): Promise<void> {
-        await this.provider.replace(this);
-    }
-
-    async delete(): Promise<void> {
-        await this.provider.delete(this);
-    }
-}
-
-function extractConstructorParameters(text: string): string[] {
-    return text.replace(/\n/g, '')
-        .slice(text.indexOf('('), text.lastIndexOf(')'))
-        .split(',')
-        .map((e) => e.includes('const')
-            ? e.slice(0, e.search(/\}|\]/) + 1)
-            : e.replace(/\(|\)|\[|\]|\{|\}|;/g, ''))
-        .map((e) => e.trim())
-        .filter(Boolean);
 }

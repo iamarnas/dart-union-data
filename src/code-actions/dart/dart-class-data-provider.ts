@@ -42,11 +42,6 @@ export class DartClassDataProvider {
         this.toJson = new ToJsonCodeAction(provider, element, this.toMap.range?.end);
         this.equality = new EqualityCodeAction(provider, element);
         this.copyWith = new CopyWithCodeAction(provider, element);
-
-
-        // for (const item of this.constructorCode.generative.items) {
-        //     console.log(item.value, item.isGenerated, item.isUpdated);
-        // }
     }
 
     get hasConvertImport(): boolean {
@@ -70,13 +65,13 @@ export class DartClassDataProvider {
     get values() {
         const values: CodeActionValue[] = [
             this.constructorCode,
-            // this.toString,
+            this.toString,
             // this.toJson,
             //this.fromJson,
-            //...this.copyWith.items,
-            ...this.fromMap.replacements,
+            ...this.copyWith.items,
+            //...this.fromMap.replacements,
             // ...this.toMap.replacements,
-            // ...this.equality.items,
+            ...this.equality.items,
         ];
 
         // if (this.copyWith.useAccurateCopyWith) {
@@ -125,33 +120,35 @@ export class DartClassDataProvider {
         const { editor } = this.provider;
         if (!editor || this.provider.document.languageId !== 'dart') return;
 
-        const removalsRanges = [...this.fromMap.removals, ...this.toMap.removals];
-        const insertionsItems = [...this.fromMap.insertions, ...this.toMap.insertions];
+        const removalsRanges = [
+            ...this.fromMap.removals,
+            ...this.toMap.removals,
+        ];
+
+        const insertionsItems = [
+            ...this.fromMap.insertions,
+            ...this.toMap.insertions,
+        ];
 
         await editor.edit((builder) => {
-            // if (this.equality.equatable.isGenerated && !this.equality.useEquatable) {
-            //     const equatableRange = this.equality.equatable.range;
-            //     if (equatableRange) {
-            //         removalsRanges.push(this.provider.reader.rangeWithRemarks(equatableRange));
-            //     }
-            // }
+            if (this.equality.equatable.isGenerated && !this.equality.useEquatable) {
+                const equatableRange = this.equality.equatable.range;
+                if (equatableRange) {
+                    removalsRanges.push(this.provider.reader.rangeWithRemarks(equatableRange));
+                }
+            }
 
-            // for (const range of removalsRanges) {
-            //     builder.delete(this.provider.reader.rangeWithRemarks(range));
-            // }
-
-            // for (const { position, insertion } of insertionsItems) {
-            //     builder.insert(position, insertion);
-            // }
-
-            // for (const { value, range } of this.values) {
-            //     if (!range) continue;
-            //     builder.replace(range, value);
-            // }
-
-            for (const { value, range } of this.constructorCode.formaters()) {
+            for (const { value, range } of this.values) {
                 if (!range) continue;
                 builder.replace(range, value);
+            }
+
+            for (const { position, insertion } of insertionsItems) {
+                builder.insert(position, insertion);
+            }
+
+            for (const range of removalsRanges) {
+                builder.delete(range);
             }
         });
     }

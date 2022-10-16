@@ -1,5 +1,6 @@
 import { DartParameterCodec, ParameterExpression } from '../codecs/dart-parameter-codec';
 import { ParameterElement, typeIdentities, TypeIdentity } from '../interface/element';
+import { regexp } from '../utils';
 
 const nullablePrimitiveTypes = ['int?', 'double?', 'num?', 'String?', 'bool?', 'dynamic?', 'Object?'] as const;
 export const primitiveTypes = ['int', 'double', 'num', 'String', 'bool', 'dynamic', 'Object', ...nullablePrimitiveTypes] as const;
@@ -85,6 +86,15 @@ export class Parameter implements ParameterElement {
 
     get isExplicitlyNullable(): boolean {
         return !this.isRequired && this.isOptional && !this.isNullable && !this.hasDefault;
+    }
+
+    /**
+     * Searches if parameter name is generated as `this.name` or `String name`.
+     */
+    maybeGenerated(input: string): boolean {
+        const match = regexp.join(/(?<=\.|\s)/, this.name, /(\s*(?==)|\s*$)/);
+        const name = match.exec(input)?.at(0)?.trim();
+        return this.name === name;
     }
 
     copyWith(parameter?: Partial<ParameterElement>): Parameter {

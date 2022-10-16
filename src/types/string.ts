@@ -1,7 +1,7 @@
 import './array';
 
-String.prototype.lengthOf = function (symbol: string): number {
-    return String(this).split('').filter((e) => e === symbol).length;
+String.prototype.lengthOf = function (search: string): number {
+    return String(this).indexesOf(search).length;
 };
 
 String.prototype.decapitalize = function (): string {
@@ -109,4 +109,29 @@ String.prototype.splitWhere = function (separator: string, from: string, to: str
     result.push(copy);
 
     return result.map((e) => e.trim()).filter(Boolean);
+};
+
+String.prototype.indexesOf = function (search: string | RegExp): Array<[number, number]> {
+    const text = String(this);
+
+    if (typeof search === 'string') {
+        return Array.from({ length: text.length })
+            .map((_, i) => text.slice(i).startsWith(search) ? [i, i + search.length] : undefined)
+            .filter(Boolean) as Array<[number, number]>;
+    }
+
+    if (search.global) {
+        return Array.from(text.matchAll(search))
+            .map((m) => !m.index ? undefined : [m.index, m.index + m[0].length])
+            .filter(Boolean) as Array<[number, number]>;
+    }
+
+    const m = search.exec(text);
+    return !m ? [] : [[m.index, m.index + m[0].length]];
+};
+
+String.prototype.pattern = function (): string {
+    const text = String(this);
+    const match = /^[^a-zA-Z0-9_ ]$/;
+    return text.split('').map((e) => match.test(e) ? '\\' + e : e).join('');
 };

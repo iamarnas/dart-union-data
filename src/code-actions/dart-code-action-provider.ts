@@ -89,10 +89,6 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.
             if (!data.equality.isGenerated) {
                 actions.push(data.equality.fix());
             }
-
-            if (data.constructorCode.formaters().length !== 0) {
-                actions.push(data.updateCommand(data));
-            }
         }
 
         return actions;

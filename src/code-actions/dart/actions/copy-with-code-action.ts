@@ -223,7 +223,7 @@ class CopyWithInterfaceCodeAction implements CodeActionValue {
     }
 
     get position(): vscode.Position {
-        return this.provider.end;
+        return this.provider.end.range.end;
     }
 
     get isGenerated(): boolean {
@@ -274,7 +274,7 @@ class CopyWithImplementionCodeAction implements CodeActionValue {
     }
 
     get position(): vscode.Position {
-        return this.provider.end;
+        return this.provider.end.range.end;
     }
 
     get isGenerated(): boolean {

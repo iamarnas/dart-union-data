@@ -1,11 +1,3 @@
-Array.prototype.at = function <T>(index: number): T | undefined {
-    if (index < 0) {
-        const i = this.length - (index * -1);
-        return this[i] as T;
-    }
-    return this[index] as T;
-};
-
 Array.prototype.removeFirst = function <T>(): T | undefined {
     return this.shift() as T;
 };

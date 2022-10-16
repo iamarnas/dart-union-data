@@ -1,6 +1,8 @@
 import { ActionValue } from '../interface';
 import { Parameter } from '../models/parameter';
+import { ConstructorRefactor } from '../refactors';
 import { ClassDataTemplate, ParametersTemplate, SubclassTemplate } from '../templates';
+import '../types/array';
 import '../types/string';
 import { buildString } from '../utils/string-buffer';
 
@@ -52,6 +54,16 @@ export class GenerativeConstructorGenerator implements ActionValue {
         return this.modifier().length
             + this.className.length
             + this.localParameters().length;
+    }
+
+    /**
+     * Refactoring an existing constructor code without removing comments it
+     * and formatting the constructor to match the dart guides lines.
+     * @param input a string of constructor.
+     * @returns `ConstructorRefactor` type with final data ready to print for the class data instances.
+     */
+    refactor(input: string): ConstructorRefactor {
+        return new ConstructorRefactor(input).watch(...this.parameters.all).format();
     }
 
     asBlock(option?: { auto: boolean }): this {

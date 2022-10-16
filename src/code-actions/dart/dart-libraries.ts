@@ -1,7 +1,7 @@
 import { Range, TextLine } from 'vscode';
 import pubspec from '../../shared/pubspec';
 import '../../types/string';
-import { CodeReader } from '../code-reader';
+import { CodeReader } from '../../utils/code-reader';
 
 export class DartLibraries {
     private buffer: Map<TextLine, Range> = new Map();

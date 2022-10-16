@@ -77,8 +77,8 @@ class RegExpManager {
     /** Checks that the field value is privately marked with the underscore `_*` or `._()` and `._internal()`. */
     readonly privacy = /\w+\s+_[a-zA-z]\w+|\._(\(|\w+\().*\)/;
 
-    /** Checks if the line is a comment. */
-    readonly comment = /\/{2,}.*|\/\*.*|^\s*\*.*/gm;
+    /** Checks if contains comments. */
+    readonly comment = /\/{2,}.*|\/\*.*|^\s*\*.*/g;
 
     /** 
      * Checks if the line starts with a comment.
@@ -107,7 +107,7 @@ class RegExpManager {
      * - To check if is it nullable type use group 4.
      * - To get a value name use group 5.
      */
-    readonly variableMatch = /(^final\s+|^\s*)([_$]*[A-Z][a-zA-Z0-9_]+)(<.*>|\S)(\?\s+|\s+)([a-z_][a-zA-Z0-9_]+)$/;
+    readonly variableMatch = /(^final\s+|^\s*)([_$]*[A-Za-z][a-zA-Z0-9_]+)(<.*>|\S)(\?\s+|\s+)([a-z_][a-zA-Z0-9_]*)$/;
 
     /** 
      * Checks if value is primitive.
@@ -134,9 +134,14 @@ class RegExpManager {
     readonly getterMatch = /^[^0-9][a-zA-Z0-9_$<>]+(\?\s+|\s+)+get\s+[a-z_$][a-zA-Z0-9_$]+(\s*|\s*;)$/;
 
     /** Combine several RegExp into one. */
-    readonly combine = (...regexes: RegExp[]): RegExp => {
+    combine(...regexes: RegExp[]): RegExp {
         return new RegExp(regexes.map((e) => e.source).join('|'), 'g');
-    };
+    }
+
+    /** Join several patterns into one. */
+    join(...patterns: Array<string | RegExp>): RegExp {
+        return new RegExp(patterns.map((e) => typeof e === 'string' ? e.pattern() : e.source).join(''));
+    }
 }
 
 export const regexp = new RegExpManager();

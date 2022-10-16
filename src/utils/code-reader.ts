@@ -1,8 +1,8 @@
 import { Position, Range, TextDocument, TextLine } from 'vscode';
+import { regexp } from '.';
 import '../types/array';
 import '../types/map';
 import '../types/string';
-import { regexp } from '../utils';
 
 /**
  * The utility class for reading programing language code syntax from text document.
@@ -225,7 +225,7 @@ export class CodeReader {
 
         for (const line of lines) {
             if (predicate(line)) {
-                return this.findCodeRange(line.text, range);
+                return this.findCodeRange(line.lineNumber, range);
             }
         }
     }
@@ -349,16 +349,12 @@ export class CodeReader {
 
     /**
      * A similar function to {@link getWordRange} but returns an array of all matches.
-     * - Note: `string` must contains backslash before repetition character ex: \\\\+
-     * @param match search element match. RegExp must be global.
-     * @param searchIn where to look for an range.
-     * @returns an array of ranges of the specified words or texts, otherwise the empty array.
+     * @param search element to search.
+     * @param searchIn where to look for an range. If no search range is specified will search in the active editor document content.
+     * @returns an array of ranges of the specified predicts, otherwise the empty array.
      */
-    getWordRanges(match: string | RegExp, searchIn?: TextLine[] | Range): Range[] {
+    getWordRanges(search: string | RegExp, searchIn?: TextLine[] | Range): Range[] {
         const ranges: Range[] = [];
-        const regx = typeof match === 'string'
-            ? new RegExp(match, 'g')
-            : match;
         let { lines } = this;
 
         if (Array.isArray(searchIn)) {
@@ -369,24 +365,9 @@ export class CodeReader {
             lines = this.rangeToLines(searchIn);
         }
 
-        if (!regx.global) {
-            console.error(`Error: returned empty array due to '${match}' is not a global`);
-            return [];
-        }
-
         for (const line of lines) {
-            const matches = line.text.matchAll(regx);
-
-            for (const m of Array.from(matches)) {
-                const { index } = m;
-
-                if (index !== undefined) {
-                    ranges.push(line.range.with(
-                        line.range.start.with({ character: index }),
-                        line.range.end.with({ character: index + m[0].length }),
-                    ));
-                }
-            }
+            const indexes = line.text.indexesOf(search);
+            ranges.push(...indexes.map(([start, end]) => new Range(line.lineNumber, start, line.lineNumber, end)));
         }
 
         return ranges;

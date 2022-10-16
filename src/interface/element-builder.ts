@@ -169,7 +169,7 @@ function buildFromSplit(split: string[]): ClassDataTemplate | undefined {
  * @param {string} content Dart language data class string.
  * @returns a string list.
  */
-function codeSplit(content: string): string[] {
+export function codeSplit(content: string): string[] {
     const isEnum = content.trimStart().startsWith('enum ');
     // Split data class properties into the one line with valid syntax.
     const body = content.split('\n').map((e) => {

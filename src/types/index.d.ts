@@ -1,11 +1,5 @@
 interface Array<T> {
     /**
-     * Returns the item located at the specified index.
-     * @param {number} index The zero-based index of the desired code unit. A negative index will count back from the last item.
-     */
-    at(index: number): T | undefined;
-
-    /**
      * Removes and returns the first object in this array.
      * If the array is empty, undefined is returned and the array is not modified.
      * 
@@ -118,6 +112,22 @@ interface String {
      * @param to a symbol that indicates the end of the ignore range.
      */
     splitWhere(separator: string, from: string, to: string): string[];
+
+    /**
+     * Convenience function to find all the start and end indexes of the item you are looking for.
+     * @param search expected index for this search.
+     * @returns an array of the numbers tuples `[number, number]`
+     */
+    indexesOf(search: string | RegExp): Array<[number, number]>;
+
+    /**
+     * Converts `string` to `RegExp` pattern ready to paste to `RegExp` constructor.
+     * @returns a string as `RegExp` pattern.
+     * @example 
+     * const text = "me+you=love"; 
+     * console.log(text.pattern()); // Output: "me\+you\=love" 
+     */
+    pattern(): string;
 }
 
 interface Map<K, V> {

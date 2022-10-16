@@ -33,7 +33,7 @@ export interface CodeActionValue extends ActionValue {
 }
 
 export interface MultiCodeActionValue extends CodeActionValue {
-    insertions(): CodeActionValue[],
-    replacements(): CodeActionValue[],
-    removals(): Range[],
+    insertions: CodeActionValue[],
+    replacements: CodeActionValue[],
+    removals: Range[],
 }
