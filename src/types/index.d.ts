@@ -128,6 +128,13 @@ interface String {
      * console.log(text.pattern()); // Output: "me\+you\=love" 
      */
     pattern(): string;
+
+    /**
+     * Convenience function to read the multiline strings.
+     * The string reads from the top to the end or to the predicted end line.
+     * @param end prediction to guess the last line.
+     */
+    endsWithLine(end: (line: string) => boolean): string;
 }
 
 interface Map<K, V> {

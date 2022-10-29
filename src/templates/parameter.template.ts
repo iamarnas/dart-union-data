@@ -119,25 +119,25 @@ export class ParametersTemplate {
 
             if (deepEqual(parameter, other)) continue;
 
-            if (parameter) {
+            if (parameter !== undefined) {
                 // Required parameters details after initialize.
                 const { value, defaultValue, isOptional, isNamed, isPositional, isRequired, isInitialized } = other;
                 // Some parameters, such as in the constructor, have no type 
                 // and not initialized fields have no parameter details.
                 // Obs: only copy with missing details from the initialize parameter to non-initialized parameters.
-                if (!parameter.isInitialized && other.isInitialized) {
-                    this.set(parameter.copyWith({
-                        isOptional: isOptional,
-                        isNamed: isNamed,
-                        isPositional: isPositional,
-                        value: value,
-                        defaultValue: defaultValue,
-                        isRequired: isRequired,
-                        isInitialized: isInitialized,
-                        // Detect enum from the default value if the enum was not marked with a comment.
-                        isEnum: !parameter.isEnum ? isEnum.test(defaultValue) : parameter.isEnum,
-                    }));
-                }
+                const copy = parameter.copyWith({
+                    isOptional: isOptional,
+                    isNamed: isNamed,
+                    isPositional: isPositional,
+                    value: value,
+                    defaultValue: defaultValue,
+                    isRequired: isRequired,
+                    isInitialized: isInitialized,
+                    // Detect enum from the default value if the enum was not marked with a comment.
+                    isEnum: !parameter.isEnum ? isEnum.test(defaultValue) : parameter.isEnum,
+                });
+
+                this.set(copy);
             }
         }
 

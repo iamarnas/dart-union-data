@@ -265,15 +265,15 @@ function createInstanceVariableFieldElement(properties: FieldProperties): FieldE
 
     if (!param) return;
 
-    const kind = param.identity === 'unknown'
-        ? ElementKind.enum
-        : ElementKind.instanceVariable;
-
     const copy = param.copyWith({
         jsonKey: properties.jsonKey,
-        isEnum: kind === ElementKind.enum,
+        isEnum: properties.isEnum,
         enums: properties.enums,
     });
+
+    const kind = copy.isEnum
+        ? ElementKind.enum
+        : ElementKind.instanceVariable;
 
     const fieldElement: FieldElement = {
         name: param.name,

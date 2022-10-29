@@ -49,7 +49,6 @@ export class DartCodeActionProvider implements vscode.CodeActionProvider<vscode.
 
             console.log(data);
 
-
             if (data.hasNoDataCreated) {
                 actions.push(data.generateCommand(data));
             }

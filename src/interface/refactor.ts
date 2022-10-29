@@ -2,6 +2,6 @@ export interface RefactorProperties {
     parameters: string[],
     value: string,
     lenght: number,
-    isBlock: boolean,
+    isBlockBody: boolean,
     hasComments: boolean,
 }

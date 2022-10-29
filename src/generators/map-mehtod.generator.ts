@@ -1,5 +1,6 @@
 import { ActionValue } from '../interface';
 import { getAbsoluteType, Parameter } from '../models/parameter';
+import { FromMapRefactor } from '../refactors/from-map-refactor';
 import pubspec from '../shared/pubspec';
 import { DartListCollection } from '../syntax/dart-list-collection';
 import { DartMapCollection } from '../syntax/dart-map-collection';
@@ -9,10 +10,10 @@ import '../types/string';
 import { buildString, StringBuffer } from '../utils/string-buffer';
 
 export class MapMethodGenerator {
-    private readonly parameters: ParametersTemplate;
-    private readonly className: string;
+    private parameters: ParametersTemplate;
+    private className: string;
 
-    constructor(element: ClassDataTemplate | SubclassTemplate) {
+    constructor(private element: ClassDataTemplate | SubclassTemplate) {
         this.parameters = element instanceof ClassDataTemplate
             ? element.instances
             : element.parameters;
@@ -74,9 +75,15 @@ export class MapMethodGenerator {
             sb.write(this.generateToMap());
         });
     }
+
+    refactor(input: string, parameter?: Parameter[]): FromMapRefactor {
+        const refactor = new FromMapRefactor(input);
+        const parameters = parameter ?? this.parameters.all;
+        return refactor.watch(...parameters);
+    }
 }
 
-function fromMapItemActionValue(parma: Parameter): ActionValue {
+export function fromMapItemActionValue(parma: Parameter): ActionValue {
     const item = fromMapItem(parma);
     const quote = item.indexOf("'") !== -1 ? "'" : '"';
     const start = item.indexOf(quote);
@@ -90,7 +97,7 @@ function fromMapItemActionValue(parma: Parameter): ActionValue {
     };
 }
 
-function toMapItemActionValue(parma: Parameter): ActionValue {
+export function toMapItemActionValue(parma: Parameter): ActionValue {
     const item = toMapItem(parma);
     const trimed = item.trimStart();
     const key = trimed.slice(0, trimed.indexOf(':') + 1);
@@ -104,6 +111,7 @@ function toMapItemActionValue(parma: Parameter): ActionValue {
 
 function fromMapItem(param: Parameter): string {
     const nullable = param.hasDefault && !param.type.endsWith('?') ? '?' : '';
+    const name = param.isNamed ? `${param.name}: ` : '';
 
     return buildString((sb) => {
         switch (param.identity) {
@@ -123,7 +131,7 @@ function fromMapItem(param: Parameter): string {
                 sb.write(enumFromMap(param, pubspec.sdkVersion));
                 break;
             case 'double':
-                sb.write(`${param.name}: (map['${param.mapKey}'] as num).toDouble(),`, 4);
+                sb.write(`${name}(map['${param.mapKey}'] as num).toDouble(),`, 4);
                 break;
             case 'Set':
                 sb.write(dartSetCollectionFromMap(param));
@@ -132,22 +140,22 @@ function fromMapItem(param: Parameter): string {
                 sb.write(dartMapCollectionFromMap(param));
                 break;
             case 'Object':
-                sb.write(`${param.name}: map['${param.mapKey}'],`, 4);
+                sb.write(`${name}map['${param.mapKey}'],`, 4);
                 break;
             case 'dynamic':
-                sb.write(`${param.name}: map['${param.mapKey}'],`, 4);
+                sb.write(`${name}map['${param.mapKey}'],`, 4);
                 break;
             case 'UnmodifiableListView':
-                sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
+                sb.write(`${name}map['${param.mapKey}'] as ${param.type},`, 4);
                 break;
             case 'UnmodifiableSetView':
-                sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
+                sb.write(`${name}map['${param.mapKey}'] as ${param.type},`, 4);
                 break;
             case 'UnmodifiableMapView':
-                sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type},`, 4);
+                sb.write(`${name}map['${param.mapKey}'] as ${param.type},`, 4);
                 break;
             default:
-                sb.write(`${param.name}: map['${param.mapKey}'] as ${param.type}${nullable}`, 4);
+                sb.write(`${name}map['${param.mapKey}'] as ${param.type}${nullable}`, 4);
 
                 if (param.hasDefault) {
                     sb.write(` ?? ${param.defaultValue}`);
@@ -255,7 +263,7 @@ function classElementFromMap(param: Parameter): string {
 
 
     if (param.isNullable) {
-        sb.writeln(`${param.name}: map['${param.mapKey}'] == null`, 4);
+        sb.write(`${param.name}: map['${param.mapKey}'] == null`, 4);
         sb.writeln('? null', 6);
 
         if (param.identity === 'unknown') {

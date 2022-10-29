@@ -1,3 +1,5 @@
+import { regexp } from './regexp';
+
 function zip<L, R>(left: L[], right: R[], separator?: string, divider = ' '): string {
     return left.map((e, i) => `${e}${divider}${right[i]}`).join(separator);
 }
@@ -16,5 +18,34 @@ function stringLine(text: string): string {
     return text.split('\n').map(trim).join('');
 }
 
-export { zip, trim, identicalCode, stringLine };
+function findCodeBlock(input: string) {
+    const hasCurly = input.indexOf('{') !== -1;
+    const hasParentheses = input.indexOf('(') !== -1;
+    const openBraket = hasCurly ? '{' : '(';
+    const closeBraket = hasCurly ? '}' : ')';
+    const error = `Could not find code from the given first line: ${input}. Check if your code is valid and includes '{}' or '()' brackets.`;
+    let a = 0, b = 0;
 
+    if (!hasCurly && !hasParentheses) {
+        console.error(error);
+        return input;
+    }
+
+    const split = input.split('\n');
+    const result: string[] = [];
+
+    for (const line of split) {
+        if (regexp.startOfComment.test(line)) continue;
+        a = a + line.lengthOf(openBraket);
+        b = b + line.lengthOf(closeBraket);
+        result.push(line);
+
+        if (a === b) {
+            return result.join('\n');
+        }
+    }
+
+    return input;
+}
+
+export { zip, trim, identicalCode, stringLine, findCodeBlock };

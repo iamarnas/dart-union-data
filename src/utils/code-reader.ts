@@ -191,7 +191,7 @@ export class CodeReader {
         const hasParentheses = start.text.indexOf('(') !== -1;
         const openBraket = hasCurly ? '{' : '(';
         const closeBraket = hasCurly ? '}' : ')';
-        const error = `Could not find code from the given first line: ${start.text}. Check if your code is valid and includes '{}' or '()' brackets.`;
+        const error = `Could not find code from the given first line: ${start.text}. Check if your code not missing some '{}' or '()' brackets.`;
         let lastLineNumber = 0, a = 0, b = 0;
 
         if (!hasCurly && !hasParentheses) {
@@ -207,6 +207,8 @@ export class CodeReader {
             lastLineNumber = line.lineNumber;
 
             if (a === b) break;
+            // After reaching the class bottom it's means nothing found in the class.
+            if (line.text.startsWith('}')) return;
         }
 
         return this.linesToRange(start, this.lineAt(lastLineNumber));
@@ -311,7 +313,9 @@ export class CodeReader {
             breakWhen: (line: TextLine) => boolean,
             searchIn?: Range,
         }): Range | undefined {
-        for (let i = selection.line; i > -1; i--) {
+        let i = selection.line;
+
+        while (i > -1) {
             const line = this.lines[i];
 
             if (option.breakWhen(line)) return;
@@ -319,6 +323,8 @@ export class CodeReader {
             if (option.startWhen(line)) {
                 return this.findCodeRange(line.lineNumber, option.searchIn);
             }
+
+            i--;
         }
     }
 

@@ -135,3 +135,9 @@ String.prototype.pattern = function (): string {
     const match = /^[^a-zA-Z0-9_ ]$/;
     return text.split('').map((e) => match.test(e) ? '\\' + e : e).join('');
 };
+
+String.prototype.endsWithLine = function (end: (line: string) => boolean): string {
+    const split = String(this).split('\n');
+    const endIndex = split.findIndex(end) + 1;
+    return split.slice(0, endIndex).join('\n');
+};

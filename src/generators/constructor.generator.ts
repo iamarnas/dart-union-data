@@ -39,11 +39,10 @@ export class GenerativeConstructorGenerator implements ActionValue {
     }
 
     /**
-     * The key represents the initialization expression of the constructor.
-     * @example `const ClassName(` or const `ClassName({`
+     * The key contains class name.
      */
     get key(): string {
-        return this.value.slice(0, this.value.indexOf('(') + 1);
+        return `${this.className}`;
     }
 
     get insertion(): string {
@@ -67,7 +66,7 @@ export class GenerativeConstructorGenerator implements ActionValue {
     }
 
     asBlock(option?: { auto: boolean }): this {
-        if (!option) {
+        if (option?.auto === true) {
             this.isBlock = this.length < 78;
             return this;
         }

@@ -2,7 +2,7 @@ import { DartParameterCodec, ParameterExpression } from '../codecs/dart-paramete
 import { ParameterElement, typeIdentities, TypeIdentity } from '../interface/element';
 import { regexp } from '../utils';
 
-const nullablePrimitiveTypes = ['int?', 'double?', 'num?', 'String?', 'bool?', 'dynamic?', 'Object?'] as const;
+const nullablePrimitiveTypes = ['int?', 'double?', 'num?', 'String?', 'bool?', 'Object?'] as const;
 export const primitiveTypes = ['int', 'double', 'num', 'String', 'bool', 'dynamic', 'Object', ...nullablePrimitiveTypes] as const;
 
 export type PrimitiveType = typeof primitiveTypes[number];
@@ -95,6 +95,13 @@ export class Parameter implements ParameterElement {
         const match = regexp.join(/(?<=\.|\s)/, this.name, /(\s*(?==)|\s*$)/);
         const name = match.exec(input)?.at(0)?.trim();
         return this.name === name;
+    }
+
+    /**
+     * Checks if the map key is in quotes in the input.
+     */
+    hasMapKeyMatch(input: string): boolean {
+        return regexp.join(/['"]/, this.mapKey, /['"]/).test(input);
     }
 
     copyWith(parameter?: Partial<ParameterElement>): Parameter {

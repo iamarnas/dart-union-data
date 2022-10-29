@@ -1,3 +1,5 @@
+type RegExpExecArrayWithIndices = RegExpExecArray & { indices: Array<[number, number]> } | null;
+
 class RegExpManager {
     /** 
      * Check if it matches the angle brackets bloc `<...>`
@@ -78,11 +80,11 @@ class RegExpManager {
     readonly privacy = /\w+\s+_[a-zA-z]\w+|\._(\(|\w+\().*\)/;
 
     /** Checks if contains comments. */
-    readonly comment = /\/{2,}.*|\/\*.*|^\s*\*.*/g;
+    readonly comment = /(?<=^|\n|\S)\s*[*/].*(?=\n|$)/g;
 
     /** 
      * Checks if the line starts with a comment.
-     * @example '//' or '//////'
+     * @example '// ' or '////// '
      */
     readonly startOfComment = /^\s*\/{2,}\s*/;
 
@@ -142,6 +144,12 @@ class RegExpManager {
     join(...patterns: Array<string | RegExp>): RegExp {
         return new RegExp(patterns.map((e) => typeof e === 'string' ? e.pattern() : e.source).join(''));
     }
+
+    indices(matches: RegExpExecArray | null): Array<[number, number]> {
+        return (matches as RegExpExecArrayWithIndices)?.indices ?? [];
+    }
 }
 
-export const regexp = new RegExpManager();
+const regexp = new RegExpManager();
+
+export { regexp, RegExpExecArrayWithIndices };

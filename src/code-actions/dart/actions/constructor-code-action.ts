@@ -4,7 +4,7 @@ import { GenerativeConstructorGenerator, SuperConstructorGenerator } from '../..
 import { CodeActionValue } from '../../../interface';
 import { ClassDataTemplate, SubclassTemplate } from '../../../templates';
 import '../../../types/string';
-import { identicalCode } from '../../../utils';
+import { identicalCode, regexp } from '../../../utils';
 
 export class ConstructorCodeAction implements CodeActionValue {
     readonly generative: GenerativeConstructorCodeAction;
@@ -58,10 +58,6 @@ export class ConstructorCodeAction implements CodeActionValue {
         return this.generative.range?.with({ end: this.super?.range?.end });
     }
 
-    get replacements(): CodeActionValue[] {
-        return [];
-    }
-
     get isBlockBody(): boolean {
         return this.provider.reader.rangeToLines(this.range).some((e) => e.text.trimEnd().endsWith(','));
     }
@@ -98,7 +94,7 @@ class GenerativeConstructorCodeAction implements CodeActionValue {
     }
 
     get insertion(): string {
-        const space = this.provider.start.isEmptyOrWhitespace ? '' : '\n';
+        const space = this.provider.start.isEmptyOrWhitespace ? ';' : ';\n';
         return '\n' + this.value + space;
     }
 
@@ -112,22 +108,22 @@ class GenerativeConstructorCodeAction implements CodeActionValue {
 
     get isUpdated(): boolean {
         if (!this.range) return false;
-        const parmas = this.action.refactor(this.provider.document.getText(this.range)).parameters;
         const formal = this.provider.element?.formalPrameters.all ?? [];
-        //return parmas.length === formal?.length && formal?.every((p) => parmas?.some((e) => p.maybeGenerated(e)));
-        return false;
+        const params = this.provider.element?.instances.all ?? [];
+
+        return params.length === formal.length && params.every((a) => formal.some((b) => a.name === b.name));
     }
 
     get range(): vscode.Range | undefined {
-        // This range can be with super constructor.
+        // This range can be included with super constructor.
         const fullRange = this.provider.reader.whereCodeFirstLine((line) => {
-            return line.text.search(this.key.pattern()) !== -1
-                && !line.text.includesOne('toString()', '=>', 'return', 'factory');
+            return regexp.join(/^(\s*const\s+|\s*)/, this.key, /(\._.*\(|\()/).test(line.text)
+                && !line.text.includesOne('toString()', '=>', 'return', 'factory', 'class', 'enum');
         }, this.provider.range);
 
         if (!fullRange) return;
 
-        // The range ends with a super constructor position.
+        // The new range with end before the super constructor.
         const range = this.provider.reader.rangeWhere(
             fullRange.start,
             (line) => line.text.includesOne(';', ':'),
@@ -137,7 +133,7 @@ class GenerativeConstructorCodeAction implements CodeActionValue {
 
         const lastLine = this.provider.document.lineAt(range.end.line);
         const character = lastLine.text.search(/\s*;|\s*:|\)\s*;|\)\s*:/);
-        // Separated by super constructor.
+        // Separate generative constructor from super constructor.
         return range.with({ end: lastLine.range.end.with({ character: character + 1 }) });
     }
 

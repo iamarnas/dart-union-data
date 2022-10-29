@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { DartClassDataProvider, DartEnumDataProvider } from '.';
-import { ElementBuilder, ElementKind } from '../../interface';
-import { CodeActionValueDelete, CodeActionValueInsert, CodeActionValueReplace } from '../../interface/action';
+import { CodeActionValueDelete, CodeActionValueInsert, CodeActionValueReplace, ElementBuilder, ElementKind } from '../../interface';
 import { ClassDataTemplate } from '../../templates';
 import { regexp } from '../../utils';
 import { CodeReader } from '../../utils/code-reader';

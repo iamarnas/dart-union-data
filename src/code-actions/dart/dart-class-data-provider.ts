@@ -69,7 +69,7 @@ export class DartClassDataProvider {
             // this.toJson,
             //this.fromJson,
             ...this.copyWith.items,
-            //...this.fromMap.replacements,
+            this.fromMap,
             // ...this.toMap.replacements,
             ...this.equality.items,
         ];
@@ -121,12 +121,12 @@ export class DartClassDataProvider {
         if (!editor || this.provider.document.languageId !== 'dart') return;
 
         const removalsRanges = [
-            ...this.fromMap.removals,
+            //...this.fromMap.removals,
             ...this.toMap.removals,
         ];
 
         const insertionsItems = [
-            ...this.fromMap.insertions,
+            //...this.fromMap.insertions,
             ...this.toMap.insertions,
         ];
 

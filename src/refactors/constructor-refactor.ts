@@ -1,16 +1,20 @@
 import { RefactorProperties } from '../interface';
 import { Parameter } from '../models/parameter';
+import '../types/string';
 import { regexp } from '../utils';
 
 /**
- * A class utility for reorganizing an existing constructor string expression by adding and removing parameters
- * and keep saving the current code syntax.
+ * A class utility for reorganizing an existing constructor string expression by adding and removing parameters.
  */
 export class ConstructorRefactor implements RefactorProperties {
     private _value: string;
 
     constructor(input: string) {
         this._value = input;
+    }
+
+    get isValid(): boolean {
+        return validateConstructor(this._value);
     }
 
     get parameters(): string[] {
@@ -21,8 +25,8 @@ export class ConstructorRefactor implements RefactorProperties {
         return this.value.length;
     }
 
-    get isBlock(): boolean {
-        return isBlockBody(this.value, this.parameters);
+    get isBlockBody(): boolean {
+        return this.parameters.some((e) => regexp.join(/(?<=\n)\s*/, e, /\s*,/).test(this._value));
     }
 
     get hasComments(): boolean {
@@ -38,6 +42,10 @@ export class ConstructorRefactor implements RefactorProperties {
         return this;
     }
 
+    /**
+     * Insert not existing parameter. To insert the specified parameter must not match formal constructor parameters.
+     * @param parameters that will be inserted.
+     */
     insert(...parameters: string[]): this;
     insert(...parameters: Parameter[]): this;
     insert(...parameters: unknown[]): this {
@@ -50,83 +58,101 @@ export class ConstructorRefactor implements RefactorProperties {
         }
 
         if (isParameterArray) {
-            const prefix = this.isBlock ? '\t\t' : '';
-            params = [...parameters as Parameter[]].map((e) => prefix + e.expression('this'));
+            const prefix = this.isBlockBody ? '\t\t' : '';
+            const filtered = [...parameters as Parameter[]].filter((p) => !this.parameters.some((e) => p.maybeGenerated(e)));
+            params = filtered.map((e) => prefix + e.expression('this')).filter(Boolean);
         }
 
         if (!params.length) return this;
 
-        const lastParameter = this.parameters[this.parameters.length - 1];
-        const search = regexp.join(/(?<=[,[{(\n])\s*/, lastParameter, /\s*(?=[,\]})])/);
-        const comma = !parameters.length ? '' : this.isBlock ? ',\n' : ', ';
-        const [_, end] = this._value.indexesOf(search).at(0) ?? [];
+        const optional = (/(?<=[,(])\s*(\{.*(?<=\S)(\s*)\}|\[.*(?<=\S)(\s*)\])\s*(?=\))/s).exec(this._value);
+        const constr = (/\(.*(?<=\S)(\s*)\)\s*(?=;|:|$)/s).exec(this._value);
+        const indeces = [...regexp.indices(optional).slice(2), regexp.indices(constr).at(1)];
+        const index = indeces.filter(Boolean).at(0)?.at(0);
+        const isBeforeComment = (/\/.*$/).test(this._value.slice(0, index));
+        const isBeforeNewLine = (/.*\n/).test(this._value.slice(index));
+        const isBeforeComma = (/,\s*$/).test(this._value.slice(0, index));
+        const comma = isBeforeComment || isBeforeComma ? '' : ', ';
+        const suffix = this.isBlockBody && !isBeforeNewLine ? ',\n' : ',';
+        const insertion = this.isBlockBody
+            ? `${comma.trimEnd()}\n${params.join(',\n')}${suffix}`
+            : `${comma}${params.join(', ')}`;
 
-        if (!end) return this;
+        if (!index || !Boolean(insertion)) return this;
 
-        this._value = this._value.insertAt(end, comma + params.join(', '));
+        this._value = this._value.insertAt(index, insertion);
 
         return this;
     }
 
+    /**
+     * Delete existing parameters. To delete the specified parameter must match formal constructor parameters.
+     * @param parameters that will be deleted.
+     */
     delete(...parameters: string[]): this;
     delete(...parameters: Parameter[]): this;
     delete(...parameters: unknown[]): this {
         const isStringArray = parameters.every((e) => typeof e === 'string');
         const isParameterArray = parameters.every((e) => e instanceof Parameter);
-        const epmtyBrackets = /(?<=[,(])\s*(\[\s*\]|{\s*})\s*(?=\))/;
-        let removals: string[] = [];
-        let value = this._value;
+        let params: string[] = [];
+        let copy = this._value;
 
         if (isStringArray) {
-            removals = parameters as string[];
+            params = parameters as string[];
         }
 
         if (isParameterArray) {
-            removals = this.parameters.filter((e) => ![...parameters as Parameter[]].some((p) => p.maybeGenerated(e)));
+            params = this.parameters.filter((e) => ![...parameters as Parameter[]].some((p) => p.maybeGenerated(e)));
         }
 
-        if (!removals.length) return this;
+        if (!params.length) return this;
 
-        for (const item of removals) {
-            const search = regexp.join(/\s*/, item, /(\s*,\s*|\s*(?=]|}|\)))/);
-            const hasComments = regexp.comment.test(value);
+        const mateches = params.filter(Boolean).map((e) => regexp.join(/\s*/, e, /(\s*,|(?=[\s\n}\])]))/));
 
-            if (hasComments) {
-                value = value.split('\n').map((line) => {
-                    if (regexp.startOfComment.test(line)) return line;
-                    return line.replace(search, '');
-                }).filter(Boolean).join('\n');
-            } else {
-                value = value.replace(search, '');
-            }
+        if (regexp.comment.test(copy)) {
+            const filtered = copy.split('\n').filter((line) => regexp.startOfComment.test(line) || !mateches.some((m) => m.test(line)));
+            this._value = filtered.join('\n');
+            return this;
         }
 
-        this._value = value.replace(epmtyBrackets, '');
+        mateches.forEach((m) => copy = copy.replace(m, ''));
+        this._value = copy;
 
         return this;
     }
 
+    /**
+     * A method that will generate a new instance according to the specified parameters.
+     * @param parameters that will be monitored.
+     * @returns new instance of {@link ConstructorRefactor}
+     */
     watch(...parameters: Parameter[]): this {
-        const deletions = this.parameters.filter((e) => !parameters.some((p) => p.maybeGenerated(e)));
-        const insertions = parameters.filter((p) => !this.parameters.some((e) => p.maybeGenerated(e)));
-        deletions.forEach((item) => this.delete(item));
-        insertions.forEach((item) => this.insert(item));
+        const epmtyBrackets = /(?<=[,(])\s*(\[\s*\]|{\s*})\s*(?=\))/;
+
+        this.insert(...parameters);
+        this.delete(...parameters);
+
+        if (!parameters.length && epmtyBrackets.test(this._value)) {
+            this._value = this._value.replace(epmtyBrackets, '');
+        }
+
         return this;
     }
 }
 
 function formatConstructor(input: string): string {
-    const hasComments = regexp.comment.test(input);
+    const hasComments = input.match(regexp.comment) !== null;
     const parameters = extractConstructorParameters(input);
-    const isFormated = isBlockBodyFormated(input, parameters);
+    const isBlockFormated = isBlockBodyFormated(input);
     const line = convertToExpressionBody(input);
+    const isOneLineLenght = line.length <= 78;
 
     if (!parameters.length) {
         return input.slice(0, input.indexOf('(') + 1) + ')';
     }
 
-    if (!hasComments && line.length <= 77) return line;
-    if (!hasComments && line.length > 77 && isFormated) return input;
+    if (!hasComments && isOneLineLenght) return line;
+    if (isBlockFormated) return input;
 
     return convertToBlockBody(input, parameters);
 }
@@ -140,18 +166,21 @@ function extractConstructorParameters(input: string): string[] {
         return [];
     }
 
-    const content = body[1].replace(/\s*\/.*/g, '')
+    const content = body[1]
         .replace(/^\s*[{[]/, '')
         .replace(/,\s*[{[]/g, ',')
         .replace(/(?<=[\]},\w'"])\s*[\]}]/, '');
 
-    return content.split(',')
+    const result = content.split(',')
         .map((e) => e.includes('const') ? e.slice(0, e.search(/[\]})]/) + 1).trim() : e.trim())
-        .filter(Boolean);
+        // Try to clean up array elements due to invalid input.
+        .filter((e) => !(/^(\s*|\W+)$/).test(e));
+
+    return result;
 }
 
 function convertToBlockBody(input: string, parameters?: string[]): string {
-    const hasComments = regexp.comment.test(input);
+    const hasComments = input.match(regexp.comment) !== null;
     const params = parameters ?? extractConstructorParameters(input);
     const last = params.at(-1);
 
@@ -190,12 +219,31 @@ function convertToExpressionBody(input: string): string {
         .replace(/(,\s*|(?<=[^{([])\s*)(?=[}\])])/, '');
 }
 
-const isBlockBody = (input: string, parameters?: string[]): boolean => {
-    const params = parameters ?? extractConstructorParameters(input);
-    return params.some((item) => regexp.join(/(?<=\n)\s*/, item, /\s*,/).test(input));
+const isBlockBodyFormated = (input: string): boolean => {
+    const split = input.trimEnd().split('\n');
+    const a = (/^\s{2}[a-zA-Z_$]/).test(split.at(0) ?? '');
+    const b = (/^\s{2}[\]})]/).test(split.at(-1) ?? '');
+    const c = split.slice(1, -1).every((line) => (/^\s{4}[a-zA-Z_$]/).test(line));
+
+    return a && b && c;
 };
 
-const isBlockBodyFormated = (input: string, parameters?: string[]): boolean => {
-    const params = parameters ?? extractConstructorParameters(input);
-    return params.every((item) => regexp.join(/(?<=\n)\s*/, item, /(\s*,\s*\n|\s*,\s*\/.*\n)/).test(input));
+const validateConstructor = (input: string): boolean => {
+    const a = input.lengthOf('(') === input.lengthOf(')') && input.lengthOf('(') !== 0;
+    const b = input.lengthOf('{') === input.lengthOf('}');
+    const c = input.lengthOf('[') === input.lengthOf(']');
+
+    if (input.match('{') !== null && input.match('[') !== null) {
+        return a && b && c;
+    }
+
+    if (input.match('{') !== null) {
+        return a && b;
+    }
+
+    if (input.match('[') !== null) {
+        return a && c;
+    }
+
+    return a;
 };
